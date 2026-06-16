@@ -1,0 +1,33 @@
+# Business Deal — Session 1 Kickoff Prompt
+
+Paste this into Claude Code (Code section of Claude desktop app) to start the project.
+
+---
+
+I'm building a single-player-vs-AI card game called Business Deal — a Monopoly Deal
+clone — as a Progressive Web App playable on my phone. All project details, rules,
+card inventory, AI strategy spec, and file structure are in CLAUDE.md.
+
+Please start by reading CLAUDE.md in full, then:
+
+1. Create the full file/folder structure as specified
+2. Build `js/deck.js` — complete card definitions for all 106 playable cards
+   (money, properties, wildcards, action cards, rent cards), plus a deck builder
+   and Fisher-Yates shuffle function
+3. Build `js/game.js` — full game state machine including:
+   - Initial deal (5 cards each)
+   - Turn phases: draw, play up to 3 cards, end turn / discard to 7
+   - Payment resolution (from bank and/or properties, no change given)
+   - Just Say No chain handling
+   - Draw pile reshuffle from discard when empty
+   - Win detection (3 complete sets of different colors)
+   - House/Hotel placement rules
+4. Add a `game.test()` function that runs a quick headless sanity check —
+   deals a game, simulates 10 random turns, and logs state to console without
+   crashing. We'll use this to verify the engine before building UI.
+
+Do not build UI yet. Focus entirely on a solid, well-commented game engine.
+The AI and UI come in later sessions.
+
+Project folder: Create all files starting from wherever you're working.
+We'll set up GitHub later.

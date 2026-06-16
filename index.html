@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Business Deal</title>
+
+  <!-- Mobile / PWA -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Business Deal">
+  <meta name="theme-color" content="#0f5bd6">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Opponents (AI) across the top -->
+    <div id="opponents"></div>
+
+    <!-- Center table: piles, play indicator, pass button -->
+    <div id="table">
+      <div id="draw-pile" class="pile-stack"></div>
+      <div id="discard-pile" class="pile-stack"></div>
+      <div id="table-right">
+        <button id="pass-btn" type="button">Pass</button>
+        <div id="play-dots"></div>
+      </div>
+      <div id="watermark">Business Deal</div>
+    </div>
+
+    <!-- You -->
+    <div id="me-area">
+      <div id="me-side">
+        <div id="me-avatar"></div>
+        <div id="me-name">You</div>
+        <div id="me-stats"></div>
+      </div>
+      <div id="me-bank" class="zone" title="Your bank"></div>
+      <div id="me-props" class="zone" title="Your properties"></div>
+    </div>
+
+    <!-- Hand -->
+    <div id="hand"></div>
+
+    <!-- Controls -->
+    <div id="controls">
+      <button id="new-game" class="pill" type="button">New Game</button>
+    </div>
+  </div>
+
+  <!-- Floating layers (built dynamically) -->
+  <div id="toast"></div>
+  <div id="card-detail"></div>
+  <div id="overlay"></div>
+  <div id="setup"></div>
+  <div id="winner"></div>
+
+  <!-- Engine + AI + UI (build order: deck -> game -> ai -> ui) -->
+  <script src="js/deck.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/ui.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', function () {
+      const ui = new UI.BusinessDealUI();
+      window.__bd = ui;
+      ui.showSetup(); // pick number of opponents, then start
+      if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+        navigator.serviceWorker.register('sw.js').catch(function (e) {
+          console.warn('Service worker registration failed:', e);
+        });
+      }
+    });
+  </script>
+</body>
+</html>

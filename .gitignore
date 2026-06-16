@@ -1,0 +1,11 @@
+# Reference material (not part of the deployed game)
+WhatsApp Image*.jpeg
+*.pdf
+
+# Local dev tooling (preview server + launch config)
+.claude/
+
+# OS cruft
+.DS_Store
+Thumbs.db
+desktop.ini
