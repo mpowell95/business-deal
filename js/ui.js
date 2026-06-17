@@ -87,12 +87,13 @@
     if (card.type === T.PROPERTY) {
       face.classList.add('property');
       const dark = LIGHT_BANDS.indexOf(card.color) === -1;
-      // Value badge in the top-left corner only (matches the reference; a
-      // bottom-right badge would collide with the rent ladder).
+      const lightStyle = dark ? '' : 'color:#1a1a1a;text-shadow:none';
+      // Value on its OWN line above the color name (the name is the most
+      // important thing on the card — never cover it with the value badge).
       face.innerHTML =
         `<div class="p-band" style="background:var(--c-${card.color})">` +
-          `<div class="p-name" style="${dark ? '' : 'color:#1a1a1a;text-shadow:none'}">${esc(CM[card.color].label)}</div></div>` +
-        `<div class="v-tl">${vchip(card.value)}</div>` +
+          `<div class="p-val" style="${lightStyle}">$${card.value}<small>M</small></div>` +
+          `<div class="p-name" style="${lightStyle}">${esc(CM[card.color].label)}</div></div>` +
         `<div class="p-body"><div class="p-ladder">${rentLadder(card.color)}</div></div>`;
       return face;
     }
@@ -140,7 +141,9 @@
     return face;
   }
 
-  // Compact "mini" property card for the zones.
+  // Compact "mini" property card for the zones — a solid color block so the
+  // set color is readable at a glance (Pink vs Red were indistinguishable as
+  // thin top stripes). Wildcards keep the rainbow fill.
   function renderMini(card, color) {
     const m = elNew('div', 'mini' + (card.type === T.PROPERTY_WILD ? ' wild' : ''));
     const bar = elNew('div', 'mini-bar');
@@ -176,6 +179,12 @@
 
     /* ---- setup chooser -------------------------------------------------- */
     showSetup() {
+      // Dismiss the win overlay first — it shares the setup's z-index and sits
+      // later in the DOM, so if left up it covers the sheet and swallows taps
+      // (the "Play Again is a dead-end" bug).
+      const win = this.$('winner'); win.classList.remove('show'); win.innerHTML = '';
+      this._closeDetail(); this._closeOverlay();
+
       let chosen = 3;          // default: 3 AI opponents (4 players)
       let diff = 'normal';     // default difficulty
       const root = this.$('setup');
@@ -223,12 +232,14 @@
       this.game.onTurnStart = (pl) => { this._bubbles = {}; this.render(); if (pl.id === 0) this.toast('Your turn — tap a card'); };
       this.game.onAfterPlay = async (pl, mv) => {
         if (pl.id !== 0) { this._bubbles[pl.id] = this._narrate(mv); this.toast(this._lastLog()); }
+        else { this.toast(this._humanFeedback(mv, this.game.logs.slice(this._logMark || 0))); }
         this.render();
         if (pl.id !== 0) await delay(this.aiDelay);
       };
       this.game.onTurnEnd = () => this.render();
 
       this.game.setup();
+      document.getElementById('app').classList.add('playing'); // reveal the board
       this.render();
       this.runLoop();
     }
@@ -261,11 +272,12 @@
 
       this._renderHand(me, myTurn);
 
-      // pass button + play dots
+      // pass button + play dots + explicit "plays left" label
       this.$('pass-btn').disabled = !this._pendingMove;
       const dots = this.$('play-dots'); dots.innerHTML = '';
       const left = myTurn ? g.playsRemaining : 0;
       for (let i = 0; i < 3; i++) dots.append(elNew('div', 'dot' + (i < left ? ' left' : '')));
+      this.$('plays-label').textContent = myTurn ? `Plays left: ${left}` : '';
     }
 
     _bank(p) { return p.bank.reduce((s, c) => s + c.value, 0); }
@@ -280,12 +292,15 @@
         const opp = elNew('div', 'opp' + (active ? ' active' : ''));
         const head = elNew('div', 'opp-head');
         head.style.background = this.meta[i].tint;
+        // Name gets the full header width (bank moved to the meta row below) so
+        // longer AI names don't truncate in the narrow 4-opponent layout.
         head.innerHTML =
           `<div class="opp-avatar">${this.meta[i].avatar}</div>` +
-          `<div class="opp-name">${esc(p.name)}</div>` +
-          `<div class="opp-bank"><span class="coin">$</span>${this._bank(p)}M</div>`;
+          `<div class="opp-name">${esc(p.name)}</div>`;
         opp.append(head);
-        opp.append(elNew('div', 'opp-meta', `🂠 ×${p.hand.length} · ${g.completeSetCount(p)}/3`));
+        opp.append(elNew('div', 'opp-meta',
+          `<span class="opp-bank"><span class="coin">$</span>${this._bank(p)}M</span>` +
+          `<span>🂠×${p.hand.length}</span><span>${g.completeSetCount(p)}/3</span>`));
         const body = elNew('div', 'opp-body');
         this._appendSets(body, p);
         this._appendBank(body, p);
@@ -298,18 +313,23 @@
     _appendSets(container, player) {
       Deck.allPropertyColors().forEach(color => {
         const grp = player.properties[color]; if (!grp) return;
-        const complete = grp.cards.length >= REQ[color];
+        const req = REQ[color];
+        const n = grp.cards.length;
+        const complete = n >= req;
         const sm = elNew('div', 'set-mini' + (complete ? ' complete' : ''));
         const stack = elNew('div', 'set-stack');
         grp.cards.forEach(c => stack.append(renderMini(c, color)));
         sm.append(stack);
-        sm.append(elNew('div', 'set-count', `${grp.cards.length}/${REQ[color]}` + (grp.house ? ' 🏠' : '') + (grp.hotel ? '🏨' : '')));
+        // A complete set caps at req/req; any extra cards show as a "+N" spare
+        // (never a nonsensical "4/3").
+        const count = complete ? `${req}/${req}${n > req ? ` +${n - req}` : ''}` : `${n}/${req}`;
+        sm.append(elNew('div', 'set-count', count + (grp.house ? ' 🏠' : '') + (grp.hotel ? '🏨' : '')));
         container.append(sm);
       });
     }
     _appendBank(container, player) {
       player.bank.slice().sort((a, b) => b.value - a.value).forEach(c => {
-        container.append(elNew('div', 'bank-chip', '$' + c.value));
+        container.append(elNew('div', 'bank-chip', `$${c.value}M`));
       });
     }
 
@@ -390,6 +410,39 @@
       return d ? d.action : null;
     }
 
+    /** A short, friendly summary of the human's own resolved move, built from
+     *  the deterministic engine logs produced during it. '' = no toast. */
+    _humanFeedback(move, logs) {
+      logs = logs || [];
+      // Total money paid TO you across all targets this move.
+      const collected = logs.reduce((s, l) => {
+        const m = l.match(/pays You \$(\d+)M/); return s + (m ? +m[1] : 0);
+      }, 0);
+      const someoneOwed = logs.some(l => /(plays|charges|asking|demanding)/.test(l)) ||
+                          /rent|action/.test(move.type);
+      const nobodyPaid = collected === 0 && logs.some(l => /nothing to pay/.test(l));
+
+      if (move.type === 'rent') {
+        return collected > 0 ? `Collected $${collected}M in rent` : 'Rent — nobody could pay';
+      }
+      if (move.type === 'action') {
+        switch (this._actionOfMove(move)) {
+          case A.SLY_DEAL: {
+            const m = logs.map(l => l.match(/steals (.+?) from/)).find(Boolean);
+            return m ? `Stole ${m[1]}` : 'Stole a property';
+          }
+          case A.FORCED_DEAL: return 'Swapped a property';
+          case A.DEAL_BREAKER: return move.targetColor ? `Took the ${CM[move.targetColor].label} set` : 'Stole a set';
+          case A.DEBT_COLLECTOR: return collected > 0 ? `Collected $${collected}M` : 'Debt — nobody could pay';
+          case A.BIRTHDAY: return collected > 0 ? `Birthday: collected $${collected}M` : 'Birthday — nobody could pay';
+          case A.PASS_GO: return 'Pass Go — drew 2 cards';
+          case A.HOUSE: return 'Added a House';
+          case A.HOTEL: return 'Added a Hotel';
+        }
+      }
+      return ''; // bank / property placements are self-evident on the board
+    }
+
     /* ======================================================================
      * Human move selection
      * ====================================================================*/
@@ -403,6 +456,9 @@
     _resolveMove(move) {
       const p = this._pendingMove; this._pendingMove = null;
       this._closeDetail(); this._closeOverlay();
+      // Mark the log position so onAfterPlay can summarise just this move's
+      // results (rent collected, steals, "nobody could pay", …).
+      this._logMark = this.game ? this.game.logs.length : 0;
       if (p) p.resolve(move);
     }
 
@@ -454,15 +510,19 @@
         const mv = d.playMoves.find(m => m.type === 'property' && m.color === card.color) || d.playMoves[0];
         return this._resolveMove(mv);
       }
+      // Every wildcard (two-color AND multi-color) is placed via an explicit
+      // color picker with completion hints — no silent auto-assignment.
       if (card.type === T.PROPERTY_WILD) {
-        if (d.isWild) { // two-color: place to the flipped color
-          const color = d.colors[d.colorIdx];
-          const mv = d.playMoves.find(m => m.type === 'property' && m.color === color) || d.playMoves[0];
-          return this._resolveMove(mv);
-        }
-        // multi-color: pick a color
+        if (d.playMoves.length === 1) return this._resolveMove(d.playMoves[0]);
         this._closeDetail();
         return this._showTargets(d.playMoves, 'Place wildcard as…');
+      }
+      // Swap/steal get guided pickers so the lists stay short and unambiguous.
+      if (card.type === T.ACTION && card.action === A.FORCED_DEAL) {
+        this._closeDetail(); return this._forcedDealFlow(d.playMoves);
+      }
+      if (card.type === T.ACTION && card.action === A.SLY_DEAL) {
+        this._closeDetail(); return this._slyDealFlow(d.playMoves);
       }
       // Single legal play → do it; otherwise pick a target.
       if (d.playMoves.length === 1) return this._resolveMove(d.playMoves[0]);
@@ -470,29 +530,136 @@
       this._showTargets(d.playMoves);
     }
 
-    _showTargets(moves, title) {
+    /** Vertical, scrollable list picker with a sticky header. Each option is
+     *  {label, win?, onPick}. A Cancel row is always appended. */
+    _pickList(title, options, opts) {
+      opts = opts || {};
       const root = this.$('overlay');
       root.innerHTML = '<div class="scrim"></div>';
-      const sheet = elNew('div', 'sheet');
-      sheet.append(elNew('h3', null, title || 'Choose a target'));
-      const row = elNew('div', 'row');
-      const seen = {};
-      moves.forEach(m => {
-        const lbl = this._describeMove(this._view, m);
-        // Distinguish identical labels (e.g. two Red cards from the same player).
-        seen[lbl.text] = (seen[lbl.text] || 0) + 1;
-        const text = seen[lbl.text] > 1 ? `${lbl.text} (${seen[lbl.text]})` : lbl.text;
-        const b = elNew('button', 'opt' + (lbl.win ? ' win' : ''), esc(text));
-        b.addEventListener('click', () => this._resolveMove(m));
-        row.append(b);
+      const sheet = elNew('div', 'sheet picker');
+      sheet.append(elNew('h3', null, esc(title)));
+      if (opts.subtitle) sheet.append(elNew('p', null, esc(opts.subtitle)));
+      const list = elNew('div', 'pick-list');
+      options.forEach(o => {
+        const b = elNew('button', 'pick' + (o.win ? ' win' : ''), esc(o.label));
+        b.addEventListener('click', o.onPick);
+        list.append(b);
       });
-      const cancel = elNew('button', 'opt ghost', 'Cancel');
+      const cancel = elNew('button', 'pick ghost', 'Cancel');
       cancel.addEventListener('click', () => this._closeOverlay());
-      row.append(cancel);
-      sheet.append(row);
+      list.append(cancel);
+      sheet.append(list);
       root.append(sheet);
       root.querySelector('.scrim').addEventListener('click', () => this._closeOverlay());
       root.classList.add('show');
+    }
+
+    _showTargets(moves, title) {
+      const seen = {};
+      const options = moves.map(m => {
+        const lbl = this._describeMove(this._view, m);
+        // Distinguish any still-identical labels as a last resort.
+        seen[lbl.text] = (seen[lbl.text] || 0) + 1;
+        const label = seen[lbl.text] > 1 ? `${lbl.text} (${seen[lbl.text]})` : lbl.text;
+        return { label, win: lbl.win, onPick: () => this._resolveMove(m) };
+      });
+      this._pickList(title || 'Choose a target', options);
+    }
+
+    /** Describe a property a player holds: color/name, $value, set progress. */
+    _propDesc(playerView, cardId) {
+      for (const color of Object.keys(playerView.properties)) {
+        const g = playerView.properties[color];
+        const c = g.cards.find(x => x.id === cardId);
+        if (!c) continue;
+        const isWild = c.type === T.PROPERTY_WILD;
+        const name = isWild
+          ? (c.isMulti ? 'Wild' : c.colors.map(k => CM[k].label).join('/'))
+          : CM[color].label;
+        return { color, name, value: c.value, count: g.cards.length, req: REQ[color], isWild };
+      }
+      return null;
+    }
+
+    /** Two cards a player can't tell apart (same color, value, real/wild) are
+     *  interchangeable for a steal/swap — keep only the first of each so the
+     *  list isn't padded with indistinguishable "(2)" duplicates. */
+    _dedupeMoves(moves, propOf) {
+      const seen = new Set(), out = [];
+      for (const m of moves) {
+        const pd = propOf(m);
+        const sig = pd ? `${pd.color}:${pd.value}:${pd.isWild ? 'w' : 'p'}` : Math.random();
+        if (seen.has(sig)) continue;
+        seen.add(sig); out.push(m);
+      }
+      return out;
+    }
+
+    /** Sly Deal: one step — pick which opponent property to steal. */
+    _slyDealFlow(moves) {
+      const me = this._view.me;
+      const oppOf = (m) => this._view.opponents.find(o => o.id === m.targetPlayerId);
+      const unique = this._dedupeMoves(moves, (m) => { const o = oppOf(m); return o && this._propDesc(o, m.targetCardId); });
+      const options = unique.map(m => {
+        const opp = oppOf(m);
+        const pd = opp && this._propDesc(opp, m.targetCardId);
+        let completes = false, win = false;
+        if (pd) {
+          const before = countOf(me.properties, pd.color);
+          completes = before < REQ[pd.color] && before + 1 >= REQ[pd.color];
+          win = completes && me.completeSets + 1 >= 3;
+        }
+        const label = pd
+          ? `${opp.name} · ${pd.name} ($${pd.value}M) [${pd.count}/${pd.req}]` +
+            (win ? ' 🏆 WINS' : completes ? ' ✓ completes' : '')
+          : 'Steal property';
+        return { label, win, onPick: () => this._resolveMove(m) };
+      });
+      this._pickList('Steal which property?', options);
+    }
+
+    /** Forced Deal: two steps — take which of theirs, then give which of yours.
+     *  Collapses the my×their combinatorial list into my+their short lists. */
+    _forcedDealFlow(moves) {
+      const me = this._view.me;
+      const oppOf = (m) => this._view.opponents.find(o => o.id === m.targetPlayerId);
+      // Group by the property to take, deduping interchangeable copies.
+      const takeMap = new Map();
+      moves.forEach(m => {
+        const opp = oppOf(m);
+        const pd = opp && this._propDesc(opp, m.targetCardId);
+        const sig = pd ? `${m.targetPlayerId}:${pd.color}:${pd.value}:${pd.isWild ? 'w' : 'p'}` : 'x';
+        if (!takeMap.has(sig)) takeMap.set(sig, []);
+        takeMap.get(sig).push(m);
+      });
+      const options = [...takeMap.values()].map(list => {
+        const m = list[0];
+        const opp = oppOf(m);
+        const pd = opp && this._propDesc(opp, m.targetCardId);
+        let completes = false;
+        if (pd) {
+          const before = countOf(me.properties, pd.color);
+          completes = before < REQ[pd.color] && before + 1 >= REQ[pd.color];
+        }
+        const label = pd
+          ? `Take ${opp.name}'s ${pd.name} ($${pd.value}M)` + (completes ? ' ✓ completes' : '')
+          : 'Take property';
+        return { label, win: false, onPick: () => this._forcedDealGive(list) };
+      });
+      this._pickList('Forced Deal — take which?', options);
+    }
+
+    _forcedDealGive(moves) {
+      const me = this._view.me;
+      const unique = this._dedupeMoves(moves, (m) => this._propDesc(me, m.myCardId));
+      const options = unique.map(m => {
+        const pd = this._propDesc(me, m.myCardId);
+        const label = pd
+          ? `Give your ${pd.name} ($${pd.value}M) [${pd.count}/${pd.req}]`
+          : 'Give property';
+        return { label, win: false, onPick: () => this._resolveMove(m) };
+      });
+      this._pickList('Forced Deal — give which?', options, { subtitle: 'You give one of yours in exchange.' });
     }
 
     _closeDetail() { const r = this.$('card-detail'); r.classList.remove('show'); r.innerHTML = ''; }
