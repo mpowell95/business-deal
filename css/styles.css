@@ -300,35 +300,38 @@ html, body {
 .cardface.act-birthday, .cardface.act-debt_collector { background: linear-gradient(160deg,#f1cfb2,#dba985); }
 .cardface.act-house, .cardface.act-hotel { background: linear-gradient(160deg,#bcd6c6,#97b7a4); }
 .cardface.act-just_say_no { background: linear-gradient(160deg,#f2b6b2,#db8a84); }
-.cardface.action .a-head {
-  text-align: center; font-size: .92em; letter-spacing: .04em; color: #5a4631;
-  padding-top: .8em;
+/* rent shares the action shell */
+.cardface.rent { background: linear-gradient(160deg,#e7d8c5,#cdb79c); }
+.cardface.action, .cardface.rent { display: flex; flex-direction: column; }
+
+/* top header strip: [big value]  ACTION CARD */
+.cardface .a-top {
+  display: flex; align-items: center; gap: .45em;
+  padding: .5em .55em .35em; background: rgba(255,255,255,.22);
+  flex: 0 0 auto;
 }
-.cardface.action .a-emblem {
-  margin: .5em auto; width: 7em; height: 7em; border-radius: 50%;
-  background: #fff; border: .25em solid #1c1c1c;
+.cardface .a-val {
+  display: flex; flex-direction: column; align-items: center; line-height: .78;
+  font-size: 1.7em; font-weight: 900; color: #1a1a1a; flex: 0 0 auto;
+}
+.cardface .a-val small { font-size: .44em; font-weight: 900; margin-top: .12em; }
+.cardface .a-card-label { font-size: .92em; font-weight: 900; color: #3a2c1a; letter-spacing: .02em; line-height: 1.05; }
+
+/* centered emblem */
+.cardface .a-emblem { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; padding: .2em; }
+.cardface .emblem-circle {
+  width: 7.2em; height: 7.2em; border-radius: 50%;
+  background: #fff; border: .28em solid #1c1c1c;
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
 }
-.cardface.action .a-emblem .icon { font-size: 2.3em; line-height: 1; }
-.cardface.action .a-emblem .nm { font-size: .82em; font-weight: 900; color: #1a1a1a; padding: 0 .3em; line-height: 1.02; }
-.cardface.action .a-desc { font-size: .8em; font-weight: 700; color: #4a3a28; text-align: center; padding: 0 1.7em; line-height: 1.12; }
-.cardface.action .v-tl, .cardface.action .v-br { color: #b3261e; }
-.cardface.action .v-tl .ring, .cardface.action .v-br .ring {
-  border: .18em solid #b3261e; border-radius: 50%; width: 1.9em; height: 1.9em;
-  display: flex; align-items: center; justify-content: center; font-size: 1em;
-}
-
-/* rent */
-.cardface.rent { background: linear-gradient(160deg,#e7d8c5,#cdb79c); }
-.cardface.rent .a-head { text-align: center; font-size: .92em; color: #5a4631; padding-top: .8em; }
-.cardface.rent .wheel {
-  margin: .6em auto; width: 6.6em; height: 6.6em; border-radius: 50%;
-  border: .25em solid #1c1c1c; position: relative;
+.cardface .emblem-circle .icon { font-size: 2.5em; line-height: 1; }
+.cardface .emblem-circle .nm { font-size: .92em; font-weight: 900; color: #1a1a1a; padding: 0 .3em; line-height: 1.05; margin-top: .1em; }
+.cardface .a-emblem .wheel {
+  width: 7em; height: 7em; border-radius: 50%; border: .28em solid #1c1c1c;
   display: flex; align-items: center; justify-content: center;
 }
-.cardface.rent .wheel .rent-lbl { font-size: 1.05em; font-weight: 900; color: #1a1a1a; background: rgba(255,255,255,.85); padding: 0 .3em; border-radius: .3em; }
-.cardface.rent .a-desc { font-size: .78em; font-weight: 700; color: #4a3a28; text-align: center; padding: 0 1.7em; line-height: 1.12; }
-.cardface.rent .v-tl, .cardface.rent .v-br { color: #b3261e; }
+.cardface .a-emblem .wheel .rent-lbl { font-size: 1.05em; font-weight: 900; color: #1a1a1a; background: rgba(255,255,255,.9); padding: 0 .3em; border-radius: .3em; }
+.cardface .a-desc { flex: 0 0 auto; font-size: .82em; font-weight: 700; color: #4a3a28; text-align: center; padding: 0 .7em .7em; line-height: 1.14; }
 
 /* selected state in hand */
 .cardface.sel { outline: .3em solid var(--coin); outline-offset: 0; transform: translateY(-6px); }

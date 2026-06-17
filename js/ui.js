@@ -115,28 +115,28 @@
       return face;
     }
 
+    // Shared top strip: [big value] [ACTION CARD] — matches the reference and
+    // keeps the value clear of the emblem/description (no overlapping rings).
+    const topStrip = (label) =>
+      `<div class="a-top"><div class="a-val">${card.value}<small>M</small></div>` +
+      `<div class="a-card-label">${label}</div></div>`;
+
     if (card.type === T.RENT) {
       face.classList.add('rent');
       face.innerHTML =
-        `<div class="v-tl"><span class="ring">${card.value}</span></div>` +
-        `<div class="a-head">RENT</div>` +
-        `<div class="wheel" style="background:${rentWheelBg(card.colors)}"><span class="rent-lbl">RENT</span></div>` +
-        `<div class="a-desc">${card.isWild ? 'Charge ONE player any color you own.' : 'Charge ALL players for ' + card.colors.map(c => CM[c].label).join(' / ') + '.'}</div>` +
-        `<div class="v-br"><span class="ring">${card.value}</span></div>`;
-      // ring style for rent corners
-      face.querySelectorAll('.ring').forEach(r => { r.style.border = '.18em solid #b3261e'; r.style.borderRadius = '50%'; r.style.width = '1.9em'; r.style.height = '1.9em'; r.style.display = 'inline-flex'; r.style.alignItems = 'center'; r.style.justifyContent = 'center'; });
+        topStrip('ACTION CARD') +
+        `<div class="a-emblem"><div class="wheel" style="background:${rentWheelBg(card.colors)}"><span class="rent-lbl">RENT</span></div></div>` +
+        `<div class="a-desc">${card.isWild ? 'Charge ONE player any color you own.' : 'Charge ALL players: ' + card.colors.map(c => CM[c].label).join(' / ') + '.'}</div>`;
       return face;
     }
 
     // ACTION
     face.classList.add('action', 'act-' + card.action);
     face.innerHTML =
-      `<div class="v-tl"><span class="ring">${card.value}</span></div>` +
-      `<div class="a-head">ACTION CARD</div>` +
-      `<div class="a-emblem"><div class="icon">${ACTION_ICON[card.action] || '⭐'}</div>` +
-        `<div class="nm">${ACTION_LABEL[card.action] || esc(card.name)}</div></div>` +
-      `<div class="a-desc">${ACTION_DESC[card.action] || ''}</div>` +
-      `<div class="v-br"><span class="ring">${card.value}</span></div>`;
+      topStrip('ACTION CARD') +
+      `<div class="a-emblem"><div class="emblem-circle"><div class="icon">${ACTION_ICON[card.action] || '⭐'}</div>` +
+        `<div class="nm">${ACTION_LABEL[card.action] || esc(card.name)}</div></div></div>` +
+      `<div class="a-desc">${ACTION_DESC[card.action] || ''}</div>`;
     return face;
   }
 

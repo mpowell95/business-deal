@@ -1,6 +1,9 @@
-# Reference material (not part of the deployed game)
+# Reference material / phone screenshots (not part of the deployed game)
 WhatsApp Image*.jpeg
+IMG_*.PNG
+IMG_*.png
 *.pdf
+.thumbs/
 
 # Local dev tooling (preview server + launch config)
 .claude/
