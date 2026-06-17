@@ -196,7 +196,7 @@
       for (let i = 0; i < def.count; i++) {
         deck.push(makeCard({
           type: CARD_TYPES.MONEY,
-          name: '$' + def.value + 'M',
+          name: def.value + 'M',
           value: def.value,
           canPay: true,
         }));
@@ -307,7 +307,7 @@
   // Short human-readable description, used by the game log / self-test.
   function describe(card) {
     if (!card) return '(none)';
-    if (card.type === CARD_TYPES.MONEY) return '$' + card.value + 'M';
+    if (card.type === CARD_TYPES.MONEY) return card.value + 'M';
     if (card.type === CARD_TYPES.PROPERTY) return COLOR_META[card.color].label + ' property';
     if (card.type === CARD_TYPES.PROPERTY_WILD) return card.name;
     return card.name; // action + rent

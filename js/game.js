@@ -570,7 +570,7 @@
       const amount = this.setRent(player, color) * multiplier;
       this.log(`${player.name} plays ${card.name} on ${Deck.COLOR_META[color].label}` +
         (doubleIds.length ? ` x${multiplier} (Double the Rent)` : '') +
-        ` for $${amount}M.`);
+        ` for ${amount}M.`);
 
       for (const target of targets) {
         const proceeds = await this._resolveJustSayNo(player, target, card);
@@ -625,7 +625,7 @@
       const totalAvailable = assets.reduce((s, a) => s + a.card.value, 0);
       const required = Math.min(amount, totalAvailable);
       if (required <= 0) {
-        this.log(`  ${debtor.name} has nothing to pay — pays $0M.`);
+        this.log(`  ${debtor.name} has nothing to pay — pays 0M.`);
         return;
       }
 
@@ -668,7 +668,7 @@
         transferred += found.card.value;
         await this._receivePayment(creditor, found.card);
       }
-      this.log(`  ${debtor.name} pays ${creditor.name} $${transferred}M` +
+      this.log(`  ${debtor.name} pays ${creditor.name} ${transferred}M` +
         (transferred > amount ? ' (no change given)' : '') + '.');
     }
 

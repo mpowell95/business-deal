@@ -36,9 +36,19 @@
   const OPP_TINTS = ['#1f8a4c', '#1f5fc8', '#c0392b', '#7d3cc0', '#0e8f8f'];
 
   const ACTION_ICON = {
-    deal_breaker: '💥', just_say_no: '🚫', pass_go: '➡️', forced_deal: '🔁',
-    sly_deal: '🕵️', debt_collector: '💵', birthday: '🎂', double_rent: '✖️',
+    deal_breaker: '💥', just_say_no: '🚫', pass_go: '➡️', forced_deal: '↔️',
+    sly_deal: '🕵️', debt_collector: '🧾', birthday: '🎂', double_rent: '✖️',
     house: '🏠', hotel: '🏨',
+  };
+  // Emblem name rendered as [small pre-word(s)] + [BIG hero word] so the
+  // crucial word is legible at a glance (e.g. GO on Pass Go). Single-word
+  // actions just use `hero`.
+  const ACTION_NAME = {
+    deal_breaker: { pre: 'DEAL', hero: 'BREAKER' }, just_say_no: { pre: 'JUST SAY', hero: 'NO!' },
+    pass_go: { pre: 'PASS', hero: 'GO' }, forced_deal: { pre: 'FORCED', hero: 'DEAL' },
+    sly_deal: { pre: 'SLY', hero: 'DEAL' }, debt_collector: { pre: 'DEBT', hero: 'COLLECTOR' },
+    birthday: { pre: "IT'S MY", hero: 'BIRTHDAY' }, double_rent: { pre: 'DOUBLE', hero: 'RENT' },
+    house: { hero: 'HOUSE' }, hotel: { hero: 'HOTEL' },
   };
   const ACTION_LABEL = {
     deal_breaker: 'DEAL BREAKER', just_say_no: 'JUST SAY NO!', pass_go: 'PASS GO',
@@ -48,9 +58,9 @@
   const ACTION_DESC = {
     deal_breaker: 'Steal a complete set of properties.', just_say_no: 'Cancel an action played against you.',
     pass_go: 'Draw 2 extra cards.', forced_deal: 'Swap a property with another player.',
-    sly_deal: 'Steal a property (not from a full set).', debt_collector: 'Force a player to pay you $5M.',
-    birthday: 'All players give you $2M.', double_rent: 'Play with a rent card to double it.',
-    house: 'Add to a full set: +$3M rent.', hotel: 'Add to a full set: +$4M rent.',
+    sly_deal: 'Steal a property (not from a full set).', debt_collector: 'Force a player to pay you 5M.',
+    birthday: 'All players give you 2M.', double_rent: 'Play with a rent card to double it.',
+    house: 'Add to a full set: +3M rent.', hotel: 'Add to a full set: +4M rent.',
   };
 
   /* ==========================================================================
@@ -58,9 +68,16 @@
    * ========================================================================*/
   function rentLadder(color) {
     const t = RENT[color];
-    return t.map((v, i) => `${i + 1}${i === t.length - 1 ? ' (full)' : ''}: <b>$${v}M</b>`).join('<br>');
+    return t.map((v, i) => `${i + 1}${i === t.length - 1 ? ' (full)' : ''}: <b>${v}M</b>`).join('<br>');
   }
-  function vchip(v) { return `<span class="vchip">$${v}<small>M</small></span>`; }
+  // Compact one-line rents for a single color (used on the split 2-color card).
+  function rentLadderShort(color) { return RENT[color].map(v => `${v}M`).join(' · '); }
+
+  // The universal value badge: a small white rounded pill, TOP-LEFT on every
+  // card. Big number with a smaller, lowered "M" for clear separation.
+  function valPillHTML(value) {
+    return `<div class="v-pill"><span class="v-num">${value}</span><span class="v-m">M</span></div>`;
+  }
 
   function rentWheelBg(colors) {
     if (colors.length >= 5) {
@@ -74,69 +91,74 @@
   function renderCardFace(card, opts) {
     opts = opts || {};
     const face = elNew('div', 'cardface');
+    const PILL = valPillHTML(card.value);
 
     if (card.type === T.MONEY) {
       face.classList.add('money', 'm' + card.value);
-      face.innerHTML =
-        `<div class="v-tl">${card.value}<small>M</small></div>` +
-        `<div class="m-center"><div class="big">${card.value}</div><div class="unit">MILLION</div></div>` +
-        `<div class="v-br">${card.value}<small>M</small></div>`;
+      face.innerHTML = PILL +
+        `<div class="m-center"><div class="big">${card.value}</div><div class="unit">MILLION</div></div>`;
       return face;
     }
 
     if (card.type === T.PROPERTY) {
       face.classList.add('property');
       const dark = LIGHT_BANDS.indexOf(card.color) === -1;
-      const lightStyle = dark ? '' : 'color:#1a1a1a;text-shadow:none';
-      // Value on its OWN line above the color name (the name is the most
-      // important thing on the card — never cover it with the value badge).
-      face.innerHTML =
+      const nameStyle = dark ? '' : 'color:#1a1a1a;text-shadow:none';
+      // Value pill sits on the white header area; the colored band below holds
+      // a large, dominant color name; rents at the bottom.
+      face.innerHTML = PILL +
         `<div class="p-band" style="background:var(--c-${card.color})">` +
-          `<div class="p-val" style="${lightStyle}">$${card.value}<small>M</small></div>` +
-          `<div class="p-name" style="${lightStyle}">${esc(CM[card.color].label)}</div></div>` +
+          `<div class="p-name" style="${nameStyle}">${esc(CM[card.color].label)}</div></div>` +
         `<div class="p-body"><div class="p-ladder">${rentLadder(card.color)}</div></div>`;
       return face;
     }
 
     if (card.type === T.PROPERTY_WILD) {
       face.classList.add('wild');
-      const bandStyle = card.isMulti
-        ? 'background:linear-gradient(90deg,#e23b9a,#f08a1d,#f6cf2e,#2faa5d,#1f3a93)'
-        : `background:linear-gradient(90deg,var(--c-${card.colors[0]}) 50%,var(--c-${card.colors[1]}) 50%)`;
-      // Compact body: the colors are what matters; full rent ladders would
-      // overflow at hand size. (Tap to enlarge for details.)
-      const body = card.isMulti
-        ? '<div class="wild-any">Use as <b>any color</b><br><small>no money value</small></div>'
-        : `<div class="wild-cols">${card.colors.map(c => `<span style="color:var(--c-${c})">${esc(CM[c].label)}</span>`).join('<br>')}</div>`;
-      const chosen = opts.chosenColor ? `<div class="wild-chosen" style="color:var(--c-${opts.chosenColor})">→ ${esc(CM[opts.chosenColor].label)}</div>` : '';
-      face.innerHTML =
-        `<div class="p-band" style="${bandStyle}"></div>` +
-        (card.canPay ? `<div class="v-tl">${vchip(card.value)}</div>` : '') +
-        `<div class="p-body"><div class="wild-title">PROPERTY WILD CARD</div>${body}${chosen}</div>`;
+      if (card.isMulti) {
+        // Multi-color "any" wild: rainbow field with a clear ANY label.
+        face.innerHTML = PILL +
+          `<div class="wm-band"></div>` +
+          `<div class="wm-body"><div class="wm-title">PROPERTY WILD</div>` +
+          `<div class="wm-any">ANY<br>COLOR</div></div>`;
+        return face;
+      }
+      // Two-color wild: split into the two colors, each half labeled with its
+      // name + rents. Rebuilt from scratch (was an unreadable stacked mess).
+      const [c1, c2] = card.colors;
+      const chosen = opts.chosenColor;
+      const half = (color, pos) => {
+        const dark = LIGHT_BANDS.indexOf(color) === -1;
+        const st = dark ? '' : 'color:#1a1a1a;text-shadow:none';
+        const on = chosen === color ? ' on' : (chosen ? ' off' : '');
+        return `<div class="w-half ${pos}${on}" style="background:var(--c-${color})">` +
+          `<div class="wh-name" style="${st}">${esc(CM[color].label)}</div>` +
+          `<div class="wh-rent" style="${st}">${rentLadderShort(color)}</div></div>`;
+      };
+      face.innerHTML = PILL +
+        `<div class="w-split">${half(c1, 'top')}${half(c2, 'bot')}</div>` +
+        `<div class="w-tag">WILD</div>`;
       return face;
     }
 
-    // Shared top strip: [big value] [ACTION CARD] — matches the reference and
-    // keeps the value clear of the emblem/description (no overlapping rings).
-    const topStrip = (label) =>
-      `<div class="a-top"><div class="a-val">${card.value}<small>M</small></div>` +
-      `<div class="a-card-label">${label}</div></div>`;
-
     if (card.type === T.RENT) {
       face.classList.add('rent');
-      face.innerHTML =
-        topStrip('ACTION CARD') +
+      face.innerHTML = PILL +
+        `<div class="a-head">ACTION CARD</div>` +
         `<div class="a-emblem"><div class="wheel" style="background:${rentWheelBg(card.colors)}"><span class="rent-lbl">RENT</span></div></div>` +
         `<div class="a-desc">${card.isWild ? 'Charge ONE player any color you own.' : 'Charge ALL players: ' + card.colors.map(c => CM[c].label).join(' / ') + '.'}</div>`;
       return face;
     }
 
-    // ACTION
+    // ACTION — one-line header; icon in a circle; the NAME as a full-width band
+    // below (hero word large) so even long names stay legible; fitted desc.
     face.classList.add('action', 'act-' + card.action);
-    face.innerHTML =
-      topStrip('ACTION CARD') +
-      `<div class="a-emblem"><div class="emblem-circle"><div class="icon">${ACTION_ICON[card.action] || '⭐'}</div>` +
-        `<div class="nm">${ACTION_LABEL[card.action] || esc(card.name)}</div></div></div>` +
+    const nm = ACTION_NAME[card.action] || { hero: esc(card.name) };
+    const nameHTML = (nm.pre ? `<span class="pre">${esc(nm.pre)}</span>` : '') + `<span class="hero">${esc(nm.hero)}</span>`;
+    face.innerHTML = PILL +
+      `<div class="a-head">ACTION CARD</div>` +
+      `<div class="a-emblem"><div class="emblem-circle"><div class="icon">${ACTION_ICON[card.action] || '⭐'}</div></div></div>` +
+      `<div class="a-name">${nameHTML}</div>` +
       `<div class="a-desc">${ACTION_DESC[card.action] || ''}</div>`;
     return face;
   }
@@ -265,7 +287,7 @@
       this.$('me-area').classList.toggle('active', myTurn);
       this.$('me-avatar').textContent = this.meta[0].avatar;
       this.$('me-stats').innerHTML =
-        `<span><span class="coin">$</span> ${this._bank(me)}M</span>` +
+        `<span><span class="coin">M</span> ${this._bank(me)}M</span>` +
         `<span>${g.completeSetCount(me)}/3 sets · 🂠${me.hand.length}</span>`;
       this._renderZoneBank(this.$('me-bank'), me);
       this._renderZoneProps(this.$('me-props'), me);
@@ -299,37 +321,40 @@
           `<div class="opp-name">${esc(p.name)}</div>`;
         opp.append(head);
         opp.append(elNew('div', 'opp-meta',
-          `<span class="opp-bank"><span class="coin">$</span>${this._bank(p)}M</span>` +
+          `<span class="opp-bank"><span class="coin">M</span>${this._bank(p)}M</span>` +
           `<span>🂠×${p.hand.length}</span><span>${g.completeSetCount(p)}/3</span>`));
         const body = elNew('div', 'opp-body');
         this._appendSets(body, p);
-        this._appendBank(body, p);
+        if (!Object.keys(p.properties).length) body.append(elNew('div', 'opp-empty', 'no property yet'));
         opp.append(body);
         if (this._bubbles[i]) opp.append(elNew('div', 'bubble', esc(this._bubbles[i])));
         box.append(opp);
       }
     }
 
+    // Each owned set as a readable colored chip: COLOR NAME + count (e.g.
+    // "PINK 2/3"). Far clearer at a glance than unlabeled mini-stacks, and it
+    // puts the meaning on the property itself rather than a lone bank total.
     _appendSets(container, player) {
       Deck.allPropertyColors().forEach(color => {
         const grp = player.properties[color]; if (!grp) return;
         const req = REQ[color];
         const n = grp.cards.length;
         const complete = n >= req;
-        const sm = elNew('div', 'set-mini' + (complete ? ' complete' : ''));
-        const stack = elNew('div', 'set-stack');
-        grp.cards.forEach(c => stack.append(renderMini(c, color)));
-        sm.append(stack);
-        // A complete set caps at req/req; any extra cards show as a "+N" spare
-        // (never a nonsensical "4/3").
-        const count = complete ? `${req}/${req}${n > req ? ` +${n - req}` : ''}` : `${n}/${req}`;
-        sm.append(elNew('div', 'set-count', count + (grp.house ? ' 🏠' : '') + (grp.hotel ? '🏨' : '')));
-        container.append(sm);
+        const dark = LIGHT_BANDS.indexOf(color) === -1;
+        const chip = elNew('div', 'set-chip' + (complete ? ' complete' : ''));
+        chip.style.background = `var(--c-${color})`;
+        if (!dark) chip.style.color = '#1a1a1a';
+        const count = complete ? `${req}/${req}${n > req ? '+' + (n - req) : ''}` : `${n}/${req}`;
+        chip.innerHTML =
+          `<span class="sc-name">${esc(CM[color].label)}</span>` +
+          `<span class="sc-count">${count}${grp.house ? '🏠' : ''}${grp.hotel ? '🏨' : ''}</span>`;
+        container.append(chip);
       });
     }
     _appendBank(container, player) {
       player.bank.slice().sort((a, b) => b.value - a.value).forEach(c => {
-        container.append(elNew('div', 'bank-chip', `$${c.value}M`));
+        container.append(elNew('div', 'bank-chip', `${c.value}M`));
       });
     }
 
@@ -346,7 +371,7 @@
     _renderTable() {
       const g = this.game;
       this.$('draw-pile').innerHTML =
-        `<div class="cardback">BUSINESS<br>DEAL</div><div class="count">×${g.deck.length}</div>`;
+        `<div class="cardback"><span>MATT'S</span><span>MONOPOLY</span></div><div class="count">×${g.deck.length}</div>`;
       const disc = this.$('discard-pile');
       const top = g.discard[g.discard.length - 1];
       disc.innerHTML = '';
@@ -395,7 +420,7 @@
       if (move.type === 'action') {
         return ({
           [A.DEAL_BREAKER]: 'Deal Breaker!', [A.SLY_DEAL]: 'Sly Deal!', [A.FORCED_DEAL]: 'Forced Deal!',
-          [A.DEBT_COLLECTOR]: 'Pay $5M!', [A.BIRTHDAY]: "It's my birthday!", [A.PASS_GO]: 'Pass Go',
+          [A.DEBT_COLLECTOR]: 'Pay 5M!', [A.BIRTHDAY]: "It's my birthday!", [A.PASS_GO]: 'Pass Go',
           [A.HOUSE]: 'House', [A.HOTEL]: 'Hotel',
         }[this._actionOfMove(move)] || 'Plays a card');
       }
@@ -416,14 +441,14 @@
       logs = logs || [];
       // Total money paid TO you across all targets this move.
       const collected = logs.reduce((s, l) => {
-        const m = l.match(/pays You \$(\d+)M/); return s + (m ? +m[1] : 0);
+        const m = l.match(/pays You (\d+)M/); return s + (m ? +m[1] : 0);
       }, 0);
       const someoneOwed = logs.some(l => /(plays|charges|asking|demanding)/.test(l)) ||
                           /rent|action/.test(move.type);
       const nobodyPaid = collected === 0 && logs.some(l => /nothing to pay/.test(l));
 
       if (move.type === 'rent') {
-        return collected > 0 ? `Collected $${collected}M in rent` : 'Rent — nobody could pay';
+        return collected > 0 ? `Collected ${collected}M in rent` : 'Rent — nobody could pay';
       }
       if (move.type === 'action') {
         switch (this._actionOfMove(move)) {
@@ -433,8 +458,8 @@
           }
           case A.FORCED_DEAL: return 'Swapped a property';
           case A.DEAL_BREAKER: return move.targetColor ? `Took the ${CM[move.targetColor].label} set` : 'Stole a set';
-          case A.DEBT_COLLECTOR: return collected > 0 ? `Collected $${collected}M` : 'Debt — nobody could pay';
-          case A.BIRTHDAY: return collected > 0 ? `Birthday: collected $${collected}M` : 'Birthday — nobody could pay';
+          case A.DEBT_COLLECTOR: return collected > 0 ? `Collected ${collected}M` : 'Debt — nobody could pay';
+          case A.BIRTHDAY: return collected > 0 ? `Birthday: collected ${collected}M` : 'Birthday — nobody could pay';
           case A.PASS_GO: return 'Pass Go — drew 2 cards';
           case A.HOUSE: return 'Added a House';
           case A.HOTEL: return 'Added a Hotel';
@@ -610,7 +635,7 @@
           win = completes && me.completeSets + 1 >= 3;
         }
         const label = pd
-          ? `${opp.name} · ${pd.name} ($${pd.value}M) [${pd.count}/${pd.req}]` +
+          ? `${opp.name} · ${pd.name} (${pd.value}M) [${pd.count}/${pd.req}]` +
             (win ? ' 🏆 WINS' : completes ? ' ✓ completes' : '')
           : 'Steal property';
         return { label, win, onPick: () => this._resolveMove(m) };
@@ -642,7 +667,7 @@
           completes = before < REQ[pd.color] && before + 1 >= REQ[pd.color];
         }
         const label = pd
-          ? `Take ${opp.name}'s ${pd.name} ($${pd.value}M)` + (completes ? ' ✓ completes' : '')
+          ? `Take ${opp.name}'s ${pd.name} (${pd.value}M)` + (completes ? ' ✓ completes' : '')
           : 'Take property';
         return { label, win: false, onPick: () => this._forcedDealGive(list) };
       });
@@ -687,12 +712,12 @@
         const base = setRentUI(me.properties, move.color);
         const mult = Math.pow(2, (move.doubleCardIds || []).length);
         const who = move.targetPlayerId != null ? this._oppName(view, move.targetPlayerId) : 'all';
-        return { text: `Rent ${CM[move.color].label}${mult > 1 ? ' ×2' : ''} → ${who} pays $${base * mult}M` };
+        return { text: `Rent ${CM[move.color].label}${mult > 1 ? ' ×2' : ''} → ${who} pays ${base * mult}M` };
       }
       if (move.type === 'action') {
         const who = move.targetPlayerId != null ? this._oppName(view, move.targetPlayerId) : null;
         switch (card.action) {
-          case A.DEBT_COLLECTOR: return { text: `${who}: pay $5M` };
+          case A.DEBT_COLLECTOR: return { text: `${who}: pay 5M` };
           case A.HOUSE: return { text: 'House → ' + CM[move.color].label };
           case A.HOTEL: return { text: 'Hotel → ' + CM[move.color].label };
           case A.SLY_DEAL: {
@@ -766,7 +791,7 @@
         root.innerHTML = '<div class="scrim"></div>';
 
         if (!all.length) {
-          const sheet = this._sheet(`<h3>You owe $${ctx.amount}M to ${esc(creditor)}</h3>` +
+          const sheet = this._sheet(`<h3>You owe ${ctx.amount}M to ${esc(creditor)}</h3>` +
             '<p>You have nothing on the table — you pay nothing.</p><button class="cta" id="ok">OK</button>');
           sheet.querySelector('#ok').addEventListener('click', () => { this._closeOverlay(); resolve([]); });
           return;
@@ -775,11 +800,11 @@
         const selected = new Set();
         const screen = elNew('div', 'pay-screen');
         const banner = elNew('div', 'pay-banner',
-          `<div class="main">${esc(creditor)} ${verb} $${ctx.amount}M${forWhat}.</div>` +
+          `<div class="main">${esc(creditor)} ${verb} ${ctx.amount}M${forWhat}.</div>` +
           '<div class="sub" id="pay-sub">Select cards worth the requested amount (no change given).</div>');
         const mid = elNew('div', 'pay-mid');
         if (ctx.sourceCard) mid.append(renderCardFace(ctx.sourceCard));
-        const sel = elNew('div', 'pay-selected', 'Selected $0M');
+        const sel = elNew('div', 'pay-selected', 'Selected 0M');
         const actions = elNew('div', 'pay-actions');
         const payBtn = elNew('button', 'pay-go', 'Pay'); payBtn.disabled = true;
         const clearBtn = elNew('button', 'pay-clear', 'Clear');
@@ -796,11 +821,11 @@
         const sum = () => all.filter(a => selected.has(a.card.id)).reduce((s, a) => s + a.value, 0);
         const refresh = () => {
           const s = sum();
-          sel.textContent = `Selected $${s}M`;
+          sel.textContent = `Selected ${s}M`;
           payBtn.disabled = s < required;
           banner.querySelector('#pay-sub').textContent = s >= required
             ? 'Now you can pay the amount.'
-            : `Select cards worth ≥ $${required}M (no change given).`;
+            : `Select cards worth ≥ ${required}M (no change given).`;
         };
         const addAsset = (a, zone) => {
           const f = renderCardFace(a.card);
@@ -892,7 +917,7 @@
   /* ---- shared helpers --------------------------------------------------- */
   function countOf(props, color) { return props[color] ? props[color].cards.length : 0; }
   function shortName(card) {
-    if (card.type === T.MONEY) return '$' + card.value + 'M';
+    if (card.type === T.MONEY) return card.value + 'M';
     if (card.type === T.PROPERTY) return CM[card.color].label;
     if (card.type === T.PROPERTY_WILD) return card.isMulti ? 'Wild (any)' : card.colors.map(c => CM[c].label).join('/');
     return card.name;
