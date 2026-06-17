@@ -2,7 +2,7 @@
  * sw.js — Service worker for offline play (cache-first).
  * Bump CACHE on any asset change to force clients to refetch.
  * ===========================================================================*/
-const CACHE = 'business-deal-v3';
+const CACHE = 'business-deal-v4';
 
 // Paths are relative so the app works from a GitHub Pages subfolder
 // (e.g. /business-deal/) as well as the domain root.

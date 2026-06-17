@@ -48,6 +48,8 @@ html, body {
   position: relative;
   display: flex; flex-direction: column;
   height: 100%; max-width: 560px; margin: 0 auto;
+  /* keep content clear of the status bar / notch */
+  padding-top: env(safe-area-inset-top);
   background:
     radial-gradient(120% 80% at 50% 18%, var(--blue-0), var(--blue-1) 55%, var(--blue-2) 100%);
   overflow: hidden;
@@ -207,8 +209,10 @@ html, body {
  * ===========================================================================*/
 #hand {
   flex: 0 0 auto;
-  display: flex; gap: 6px; padding: 8px 10px;
-  overflow-x: auto; background: rgba(0,0,0,.28);
+  display: flex; gap: 4px; padding: 8px 8px;
+  justify-content: center;
+  overflow: hidden;            /* all cards scaled to fit — no sideways scroll */
+  background: rgba(0,0,0,.28);
   border-top: 2px solid rgba(0,0,0,.3);
 }
 #hand .cardface { flex: 0 0 auto; transition: transform .12s ease; }
@@ -270,23 +274,24 @@ html, body {
 .cardface.money.m10 { background: linear-gradient(160deg,#ffb066,#e8821e); color:#fff; }
 
 /* property */
-.cardface.property .p-band { height: 4.6em; display: flex; align-items: center; justify-content: center; }
+.cardface.property .p-band { height: 4em; display: flex; align-items: center; justify-content: center; padding: 0 .3em; }
 .cardface.property .p-band .p-name {
-  color: #fff; font-size: 1.15em; text-align: center; padding: 0 .4em;
+  color: #fff; font-size: 1.1em; text-align: center; padding: 0 1.6em;
   text-shadow: 0 .12em .12em rgba(0,0,0,.45); line-height: 1.05;
 }
-.cardface.property .p-body { padding: .5em .6em; }
-.cardface.property .p-ladder { font-size: 1.02em; color: #333; line-height: 1.35; }
+.cardface.property .p-body { padding: .55em .6em; }
+.cardface.property .p-ladder { font-size: .96em; color: #333; line-height: 1.32; white-space: nowrap; }
 .cardface.property .p-ladder b { color: #111; }
 .cardface .v-tl.dark, .cardface .v-br.dark { color: #fff; text-shadow: 0 .1em .1em rgba(0,0,0,.4); }
 
 /* wildcard */
 .cardface.wild .p-band { height: 4.2em; }
 .cardface.wild .p-band.rainbow { background: linear-gradient(90deg,#e23b9a,#f08a1d,#f6cf2e,#2faa5d,#1f3a93); }
-.cardface.wild .p-body { padding: .5em .6em; }
-.cardface.wild .wild-title { font-size: .95em; color: #444; text-align: center; line-height: 1.2; }
-.cardface.wild .wild-col { font-size: .72em; color: #333; line-height: 1.2; margin-top: .25em; text-align: center; }
-.cardface.wild .wild-col b { font-size: 1.05em; }
+.cardface.wild .p-body { padding: .5em .5em; }
+.cardface.wild .wild-title { font-size: .85em; color: #555; text-align: center; line-height: 1.15; }
+.cardface.wild .wild-cols { text-align: center; font-size: 1.25em; line-height: 1.5; margin-top: .5em; font-weight: 900; }
+.cardface.wild .wild-any { text-align: center; font-size: 1em; color: #333; margin-top: .6em; line-height: 1.3; }
+.cardface.wild .wild-chosen { text-align: center; font-weight: 900; margin-top: .3em; font-size: 1.1em; }
 
 /* action */
 .cardface.action { background: linear-gradient(160deg,#e7d8c5,#cdb79c); }
@@ -306,7 +311,7 @@ html, body {
 }
 .cardface.action .a-emblem .icon { font-size: 2.3em; line-height: 1; }
 .cardface.action .a-emblem .nm { font-size: .82em; font-weight: 900; color: #1a1a1a; padding: 0 .3em; line-height: 1.02; }
-.cardface.action .a-desc { font-size: .82em; font-weight: 700; color: #4a3a28; text-align: center; padding: 0 .7em; line-height: 1.12; }
+.cardface.action .a-desc { font-size: .8em; font-weight: 700; color: #4a3a28; text-align: center; padding: 0 1.7em; line-height: 1.12; }
 .cardface.action .v-tl, .cardface.action .v-br { color: #b3261e; }
 .cardface.action .v-tl .ring, .cardface.action .v-br .ring {
   border: .18em solid #b3261e; border-radius: 50%; width: 1.9em; height: 1.9em;
@@ -322,7 +327,7 @@ html, body {
   display: flex; align-items: center; justify-content: center;
 }
 .cardface.rent .wheel .rent-lbl { font-size: 1.05em; font-weight: 900; color: #1a1a1a; background: rgba(255,255,255,.85); padding: 0 .3em; border-radius: .3em; }
-.cardface.rent .a-desc { font-size: .8em; font-weight: 700; color: #4a3a28; text-align: center; padding: 0 .7em; line-height: 1.12; }
+.cardface.rent .a-desc { font-size: .78em; font-weight: 700; color: #4a3a28; text-align: center; padding: 0 1.7em; line-height: 1.12; }
 .cardface.rent .v-tl, .cardface.rent .v-br { color: #b3261e; }
 
 /* selected state in hand */
@@ -428,11 +433,14 @@ html, body {
 /* =============================================================================
  * Toast
  * ===========================================================================*/
+/* Mid-screen toast for opponent updates — never over the hand, and never
+   intercepts taps (pointer-events:none) so it can't block modal selections. */
 #toast {
-  position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
-  z-index: 60; max-width: 90%; display: none;
+  position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%);
+  z-index: 55; max-width: 84%; display: none; pointer-events: none;
 }
-#toast.show { display: block; animation: pop .2s ease; }
-#toast .msg { background: rgba(0,0,0,.82); color: #fff; font-size: 13px; font-weight: 800;
-              padding: 9px 16px; border-radius: 20px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
-@keyframes pop { from { transform: translate(-50%,8px); opacity: 0;} to { transform: translate(-50%,0); opacity: 1;} }
+#toast.show { display: block; }
+#toast .msg { background: rgba(0,0,0,.86); color: #fff; font-size: 14px; font-weight: 800;
+              padding: 11px 18px; border-radius: 16px; text-align: center; box-shadow: 0 6px 16px rgba(0,0,0,.5);
+              animation: pop .2s ease; }
+@keyframes pop { from { transform: translateY(8px); opacity: 0;} to { transform: translateY(0); opacity: 1;} }

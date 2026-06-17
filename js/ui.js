@@ -87,12 +87,13 @@
     if (card.type === T.PROPERTY) {
       face.classList.add('property');
       const dark = LIGHT_BANDS.indexOf(card.color) === -1;
+      // Value badge in the top-left corner only (matches the reference; a
+      // bottom-right badge would collide with the rent ladder).
       face.innerHTML =
         `<div class="p-band" style="background:var(--c-${card.color})">` +
           `<div class="p-name" style="${dark ? '' : 'color:#1a1a1a;text-shadow:none'}">${esc(CM[card.color].label)}</div></div>` +
         `<div class="v-tl">${vchip(card.value)}</div>` +
-        `<div class="p-body"><div class="p-ladder">${rentLadder(card.color)}</div></div>` +
-        `<div class="v-br">${vchip(card.value)}</div>`;
+        `<div class="p-body"><div class="p-ladder">${rentLadder(card.color)}</div></div>`;
       return face;
     }
 
@@ -101,14 +102,15 @@
       const bandStyle = card.isMulti
         ? 'background:linear-gradient(90deg,#e23b9a,#f08a1d,#f6cf2e,#2faa5d,#1f3a93)'
         : `background:linear-gradient(90deg,var(--c-${card.colors[0]}) 50%,var(--c-${card.colors[1]}) 50%)`;
+      // Compact body: the colors are what matters; full rent ladders would
+      // overflow at hand size. (Tap to enlarge for details.)
       const body = card.isMulti
-        ? '<div style="text-align:center;font-size:.95em;color:#333;margin-top:.4em">Use as <b>any color</b>.<br>No money value.</div>'
-        : card.colors.map(c =>
-            `<div class="wild-col"><b style="color:var(--c-${c})">${esc(CM[c].label)}</b> · ${rentLadder(c)}</div>`).join('');
-      const chosen = opts.chosenColor ? `<div style="text-align:center;color:var(--c-${opts.chosenColor});font-weight:900;margin-top:.2em">→ ${esc(CM[opts.chosenColor].label)}</div>` : '';
+        ? '<div class="wild-any">Use as <b>any color</b><br><small>no money value</small></div>'
+        : `<div class="wild-cols">${card.colors.map(c => `<span style="color:var(--c-${c})">${esc(CM[c].label)}</span>`).join('<br>')}</div>`;
+      const chosen = opts.chosenColor ? `<div class="wild-chosen" style="color:var(--c-${opts.chosenColor})">→ ${esc(CM[opts.chosenColor].label)}</div>` : '';
       face.innerHTML =
         `<div class="p-band" style="${bandStyle}"></div>` +
-        (card.canPay ? `<div class="v-tl">${vchip(card.value)}</div><div class="v-br">${vchip(card.value)}</div>` : '') +
+        (card.canPay ? `<div class="v-tl">${vchip(card.value)}</div>` : '') +
         `<div class="p-body"><div class="wild-title">PROPERTY WILD CARD</div>${body}${chosen}</div>`;
       return face;
     }
@@ -338,13 +340,32 @@
     }
 
     _renderHand(me, interactive) {
-      const hand = this.$('hand'); hand.innerHTML = '';
+      const handEl = this.$('hand'); handEl.innerHTML = '';
+      const n = me.hand.length;
+      const cards = [];
       me.hand.forEach(card => {
         const f = renderCardFace(card);
         if (interactive && this._pendingMove) f.addEventListener('click', () => this._openDetail(card.id));
         else f.style.cursor = 'default';
-        hand.append(f);
+        handEl.append(f);
+        cards.push(f);
       });
+      if (!n) return;
+      // Fit every card in the available width — no horizontal scrolling.
+      // First scale the card font-size; if that bottoms out, overlap slightly.
+      const W = (handEl.clientWidth || Math.min(window.innerWidth, 560)) - 16;
+      const gap = 4, cardEm = 9.2;
+      let fs = (W - (n - 1) * gap) / (n * cardEm);
+      fs = Math.max(4.6, Math.min(7.4, fs));
+      const cardW = cardEm * fs;
+      const total = n * cardW + (n - 1) * gap;
+      const overlap = total > W ? (total - W) / (n - 1) : 0;
+      cards.forEach((f, i) => {
+        f.style.setProperty('--fs', fs + 'px');
+        f.style.marginLeft = i === 0 ? '0' : (-overlap) + 'px';
+        f.style.zIndex = String(i); // later cards on top so left strips stay tappable
+      });
+      handEl.style.justifyContent = overlap > 0 ? 'flex-start' : 'center';
     }
 
     _narrate(move) {
