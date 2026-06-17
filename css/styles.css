@@ -156,12 +156,13 @@ html, body {
   background: linear-gradient(145deg, #15a07a, #0c6b53);
   border: 2px solid #0a4a39;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  text-align: center; gap: 2px; padding: 0 3px;
+  text-align: center; gap: 3px; padding: 0 2px;
   color: #eafff5; box-shadow: 0 3px 8px rgba(0,0,0,.4);
 }
-#draw-pile .cardback span { font-weight: 900; line-height: 1; letter-spacing: .02em; }
-#draw-pile .cardback span:first-child { font-size: 8.5px; opacity: .9; }
-#draw-pile .cardback span:last-child { font-size: 10px; }
+/* Both words must fit the 54px card width — MONOPOLY (8 chars) is the limit. */
+#draw-pile .cardback span { font-weight: 900; line-height: 1; letter-spacing: -.3px; white-space: nowrap; }
+#draw-pile .cardback span:first-child { font-size: 7px; opacity: .9; }
+#draw-pile .cardback span:last-child { font-size: 7px; }
 #draw-pile .count, #discard-pile .count {
   text-align: center; font-size: 11px; color: var(--ink-soft); margin-top: 2px;
 }
