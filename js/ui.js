@@ -400,15 +400,26 @@
         cards.push(f);
       });
       if (!n) return;
-      // Fit every card in the available width — no horizontal scrolling.
-      // First scale the card font-size; if that bottoms out, overlap slightly.
+      // Keep cards a READABLE size and overlap them into a fan to fit the width
+      // (like the real app) — never shrink the text to illegibility, never
+      // scroll sideways. Each card's left edge (its value pill) stays visible
+      // and tappable; the rightmost card is fully shown.
       const W = (handEl.clientWidth || Math.min(window.innerWidth, 560)) - 16;
       const gap = 4, cardEm = 9.2;
-      let fs = (W - (n - 1) * gap) / (n * cardEm);
-      fs = Math.max(4.6, Math.min(7.4, fs));
-      const cardW = cardEm * fs;
-      const total = n * cardW + (n - 1) * gap;
-      const overlap = total > W ? (total - W) / (n - 1) : 0;
+      const fit = (W - (n - 1) * gap) / (n * cardEm);     // size that fits with NO overlap
+      let fs = Math.max(6.6, Math.min(7.4, fit));         // floor 6.6 → overlap instead of shrinking
+      let cardW = cardEm * fs;
+      let total = n * cardW + (n - 1) * gap;
+      let overlap = total > W ? (total - W) / (n - 1) : 0;
+      // Visible left strip per overlapped card = (W - cardW)/(n-1). If a huge
+      // hand makes that too thin to read/tap, ease the size down (to a hard floor).
+      if (n > 1 && overlap > 0 && (W - cardW) / (n - 1) < 22) {
+        cardW = Math.max(cardEm * 5.2, W - 22 * (n - 1));
+        fs = Math.min(7.4, cardW / cardEm);
+        cardW = cardEm * fs;
+        total = n * cardW + (n - 1) * gap;
+        overlap = total > W ? (total - W) / (n - 1) : 0;
+      }
       cards.forEach((f, i) => {
         f.style.setProperty('--fs', fs + 'px');
         f.style.marginLeft = i === 0 ? '0' : (-overlap) + 'px';
