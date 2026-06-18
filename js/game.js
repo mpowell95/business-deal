@@ -474,26 +474,15 @@
         case A.SLY_DEAL: {
           const found = this.removeFromTable(target, move.targetCardId);
           if (!found) return;
-          const color = found.card.type === T.PROPERTY_WILD
-            ? (found.card.assignedColor || found.color)
-            : found.card.color;
-          this.addProperty(player, found.card, color);
+          await this._giveProperty(player, found.card, found.color);
           this.log(`  ${player.name} steals ${Deck.describe(found.card)} from ${target.name}.`);
           break;
         }
         case A.FORCED_DEAL: {
           const mine = this.removeFromTable(player, move.myCardId);
           const theirs = this.removeFromTable(target, move.targetCardId);
-          if (mine) {
-            const c = mine.card;
-            const color = c.type === T.PROPERTY_WILD ? (c.assignedColor || mine.color) : c.color;
-            this.addProperty(target, c, color);
-          }
-          if (theirs) {
-            const c = theirs.card;
-            const color = c.type === T.PROPERTY_WILD ? (c.assignedColor || theirs.color) : c.color;
-            this.addProperty(player, c, color);
-          }
+          if (mine) await this._giveProperty(target, mine.card, mine.color);
+          if (theirs) await this._giveProperty(player, theirs.card, theirs.color);
           this.log(`  ${player.name} swaps properties with ${target.name}.`);
           break;
         }
@@ -680,20 +669,28 @@
     /** Creditor receives a paid card: money/action/rent -> bank; property -> set. */
     async _receivePayment(creditor, card) {
       if (card.type === T.PROPERTY || card.type === T.PROPERTY_WILD) {
-        let color;
-        if (card.type === T.PROPERTY) {
-          color = card.color;
-        } else {
-          const valid = Deck.placeableColors(card);
-          try {
-            color = await creditor.agent.assignWildColor(this.getView(creditor.id), card, valid);
-          } catch (e) { color = valid[0]; }
-          if (valid.indexOf(color) === -1) color = valid[0];
-        }
-        this.addProperty(creditor, card, color);
+        await this._giveProperty(creditor, card);
       } else {
         creditor.bank.push(card); // buildings paid as cards also land in the bank
       }
+    }
+
+    /** Place a property a player has just acquired (steal / swap / payment).
+     *  Wildcards let the RECEIVER choose the color (their agent decides — the
+     *  human gets a picker), so acquiring a wild never silently auto-assigns. */
+    async _giveProperty(recipient, card, fallbackColor) {
+      if (card.type !== T.PROPERTY_WILD) {
+        this.addProperty(recipient, card, card.color);
+        return card.color;
+      }
+      const valid = Deck.placeableColors(card);
+      let color = card.assignedColor || fallbackColor || valid[0];
+      try {
+        color = await recipient.agent.assignWildColor(this.getView(recipient.id), card, valid);
+      } catch (e) { /* keep fallback */ }
+      if (valid.indexOf(color) === -1) color = valid[0];
+      this.addProperty(recipient, card, color);
+      return color;
     }
 
     /* ======================================================================

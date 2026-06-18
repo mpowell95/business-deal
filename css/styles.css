@@ -375,7 +375,7 @@ html, body {
   display: flex; align-items: center; justify-content: center;
 }
 .cardface .a-emblem .wheel .rent-lbl { font-size: 1.05em; font-weight: 900; color: #1a1a1a; background: rgba(255,255,255,.92); padding: 0 .3em; border-radius: .3em; }
-.cardface .a-desc { flex: 0 0 auto; font-size: .72em; font-weight: 700; color: #4a3a28; text-align: center; padding: 0 .55em .5em; line-height: 1.12; }
+.cardface .a-desc { flex: 0 0 auto; font-size: .82em; font-weight: 800; color: #3a2c1a; text-align: center; padding: 0 .5em .5em; line-height: 1.12; }
 
 /* selected state in hand */
 .cardface.sel { outline: .3em solid var(--coin); outline-offset: 0; transform: translateY(-6px); }
@@ -424,6 +424,11 @@ html, body {
   padding: 16px 16px calc(18px + env(safe-area-inset-bottom));
   box-shadow: 0 -8px 24px rgba(0,0,0,.5); animation: up .18s ease;
 }
+/* Pickers fade in place instead of sliding up, so option rows don't move under
+   your finger mid-animation (which caused steal/swap mis-taps). */
+.sheet.picker, .sheet.swatch-sheet { animation: sheet-fade .14s ease; }
+@keyframes sheet-fade { from { opacity: 0; } to { opacity: 1; } }
+
 /* Vertical, scrollable target/steal/swap picker with a header that stays put */
 .sheet.picker h3 {
   position: sticky; top: -16px; z-index: 1; margin: -16px -16px 8px;
@@ -556,8 +561,8 @@ html, body {
      your bank/hand), so it never covers the panel whose state just changed.
      z-index stays below the modals (50) and pointer-events:none so it can't
      block taps or cover the payment screen. */
-  position: fixed; left: 50%; top: 41%; transform: translate(-50%, -50%);
-  z-index: 45; max-width: 88%; display: none; pointer-events: none;
+  position: fixed; left: 50%; top: 38%; transform: translate(-50%, -50%);
+  z-index: 45; max-width: 72%; display: none; pointer-events: none;
 }
 #toast.show { display: block; }
 #toast .msg { background: rgba(0,0,0,.88); color: #fff; font-size: 14px; font-weight: 800;

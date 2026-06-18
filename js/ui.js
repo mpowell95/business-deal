@@ -30,7 +30,7 @@
 
   // Bump alongside the sw.js cache name on every release so the visible stamp
   // and the cached build always match.
-  const APP_VERSION = 'v14';
+  const APP_VERSION = 'v15';
 
   const LIGHT_BANDS = ['lightblue', 'yellow', 'utility']; // need dark text on band
 
@@ -293,7 +293,12 @@
           this._bubbles[pl.id] = this._narrate(mv); this.render();
           await this._announceAIMove(pl, mv, fresh);   // clear beat for attacks; toast otherwise
         } else {
-          this.toast(this._humanFeedback(mv, fresh)); this.render();
+          // Hold meaningful feedback (collected rent, a steal, "nobody could
+          // pay") on screen for a beat so it isn't instantly wiped by the next
+          // turn's banner when it was your 3rd/last play.
+          const msg = this._humanFeedback(mv, fresh);
+          this.toast(msg); this.render();
+          if (msg) await delay(950);
         }
       };
       // Narrate every Just Say No so the player understands why their JSN did
@@ -317,6 +322,9 @@
     async runLoop() {
       const g = this.game;
       while (!g.winner) { await g.playTurn(); this.render(); }
+      // Let the winning move's feedback (e.g. "Took the Pink set") land before
+      // the victory screen takes over.
+      await delay(1300);
       this.showWinner();
     }
 
@@ -641,11 +649,20 @@
       if (card.type === T.MONEY) return 'money is banked, not played.';
       if (card.type === T.RENT) return 'you don’t own any of this card’s colors yet.';
       if (card.type !== T.ACTION) return '';
+      // Complete sets I own, and whether any can actually take a building.
+      const props = this._view.me.properties;
+      const complete = Object.keys(props).filter(c => props[c].cards.length >= REQ[c]);
+      const buildable = complete.filter(c => Deck.NO_BUILDING_COLORS.indexOf(c) === -1);
+      const onlyRailUtil = complete.length > 0 && buildable.length === 0;
       switch (card.action) {
         case A.JUST_SAY_NO: return 'it plays automatically when you’re attacked.';
         case A.DOUBLE_RENT: return 'play it together with a Rent card to double it.';
-        case A.HOUSE: return 'needs a complete set with no house yet.';
-        case A.HOTEL: return 'needs a complete set that already has a house.';
+        case A.HOUSE:
+          return onlyRailUtil ? 'Houses can’t be added to Railroad or Utility sets.'
+                              : 'needs a complete set with no house yet.';
+        case A.HOTEL:
+          return onlyRailUtil ? 'Hotels can’t be added to Railroad or Utility sets.'
+                              : 'needs a complete set that already has a house.';
         case A.DEAL_BREAKER: return 'no opponent has a complete set to steal.';
         case A.SLY_DEAL:
         case A.FORCED_DEAL: return 'no opponent has a stealable property.';
@@ -977,8 +994,11 @@
           const s = all.filter(a => selected.has(a.card.id)).reduce((sum, a) => sum + a.value, 0);
           sel.textContent = `Selected ${s}M`;
           payBtn.disabled = s < required;
-          banner.querySelector('#pay-sub').textContent = s >= required
-            ? 'Tap Pay to settle up.' : `Need ${required}M (no change given).`;
+          // Warn explicitly when the selection exceeds the demand (no change back).
+          banner.querySelector('#pay-sub').textContent =
+            s > required ? `Overpaying by ${s - required}M — no change given.`
+          : s === required ? 'Exact amount — tap Pay.'
+          : `Need ${required}M (no change given).`;
         };
         const mkZone = (label, assets, emptyMsg) => {
           scroll.append(elNew('div', 'pay-zlabel', label));
@@ -1047,15 +1067,36 @@
     }
 
     promptWildColor(view, card, valid) {
+      const me = view.me;
+      const what = card.isMulti ? 'multi-color' : (card.colors || []).map(c => CM[c].label).join(' / ');
       return new Promise(resolve => {
-        const sheet = this._sheet('<h3>Place wildcard</h3><p>Assign it to one of your sets:</p><div class="row" id="w-row"></div>');
-        const row = sheet.querySelector('#w-row');
-        valid.forEach(color => {
-          const b = elNew('button', 'opt', CM[color].label);
-          b.style.borderBottom = `4px solid var(--c-${color})`;
+        const root = this.$('overlay');
+        root.innerHTML = '<div class="scrim"></div>';
+        const sheet = elNew('div', 'sheet swatch-sheet');
+        // Framed as an INCOMING card (this only fires when you acquire a wild via
+        // payment / Sly Deal / Forced Deal) so it never looks like a stray bug.
+        sheet.append(elNew('h3', null, 'You received a wildcard'));
+        sheet.append(elNew('p', null, `Assign your new ${what} wildcard to a set:`));
+        const grid = elNew('div', 'swatch-grid');
+        const scored = valid.map(color => {
+          const before = countOf(me.properties, color);
+          const completes = before < REQ[color] && before + 1 >= REQ[color];
+          const win = completes && me.completeSets + 1 >= 3;
+          return { color, completes, win, rank: win ? 0 : completes ? 1 : 2 };
+        }).sort((a, b) => a.rank - b.rank);
+        scored.forEach(({ color, completes, win }) => {
+          const dark = LIGHT_BANDS.indexOf(color) === -1;
+          const b = elNew('button', 'swatch' + (win ? ' win' : completes ? ' completes' : ''));
+          b.style.background = `var(--c-${color})`;
+          if (!dark) b.style.color = '#1a1a1a';
+          b.innerHTML = `<span class="sw-name">${esc(colorLabel(color))}</span>` +
+            (win ? '<span class="sw-tag">🏆 WINS</span>' : completes ? '<span class="sw-tag">✓ completes</span>' : '');
           b.addEventListener('click', () => { this._closeOverlay(); resolve(color); });
-          row.append(b);
+          grid.append(b);
         });
+        sheet.append(grid);
+        root.append(sheet);
+        root.classList.add('show');
       });
     }
 
@@ -1090,9 +1131,11 @@
   function countOf(props, color) { return props[color] ? props[color].cards.length : 0; }
   function shortName(card) {
     if (card.type === T.MONEY) return card.value + 'M';
-    if (card.type === T.PROPERTY) return CM[card.color].label;
+    if (card.type === T.PROPERTY) return colorLabel(card.color);
     if (card.type === T.PROPERTY_WILD) return card.isMulti ? 'Wild (any)' : card.colors.map(c => CM[c].label).join('/');
-    return card.name;
+    // Use the same label the card face shows (e.g. "DOUBLE RENT", not the deck's
+    // "Double The Rent") so the discard list matches the card.
+    return ACTION_LABEL[card.action] || card.name;
   }
   function setRentUI(props, color) {
     const g = props[color];
