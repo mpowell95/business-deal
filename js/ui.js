@@ -30,9 +30,15 @@
 
   // Bump alongside the sw.js cache name on every release so the visible stamp
   // and the cached build always match.
-  const APP_VERSION = 'v12';
+  const APP_VERSION = 'v13';
 
   const LIGHT_BANDS = ['lightblue', 'yellow', 'utility']; // need dark text on band
+
+  // Railroad & Utility are the two "sets" not identified by a vivid color block,
+  // so they get an icon; every other set reads from its color. colorLabel()
+  // prepends the icon where a color name is shown on a card/chip.
+  const COLOR_EMOJI = { railroad: '🚂', utility: '💡' };
+  const colorLabel = (color) => (COLOR_EMOJI[color] ? COLOR_EMOJI[color] + ' ' : '') + CM[color].label;
 
   // AI opponent flavor (names + avatar emoji + header tint).
   const AI_NAMES = ['NobleRep', 'Parker', 'JustVendor', 'Mogul Mae', 'Tycoon Tim', 'Baron Bo'];
@@ -41,7 +47,7 @@
 
   const ACTION_ICON = {
     deal_breaker: '💥', just_say_no: '🚫', pass_go: '➡️', forced_deal: '↔️',
-    sly_deal: '🕵️', debt_collector: '🧾', birthday: '🎂', double_rent: '✖️',
+    sly_deal: '🕵️', debt_collector: '🧾', birthday: '🎂', double_rent: '×2',
     house: '🏠', hotel: '🏨',
   };
   // Emblem name rendered as [small pre-word(s)] + [BIG hero word] so the
@@ -112,7 +118,7 @@
       // a large, dominant color name; rents at the bottom.
       face.innerHTML = PILL +
         `<div class="p-band" style="background:var(--c-${card.color})">` +
-          `<div class="p-name" style="${nameStyle}">${esc(CM[card.color].label)}</div></div>` +
+          `<div class="p-name" style="${nameStyle}">${esc(colorLabel(card.color))}</div></div>` +
         `<div class="p-body"><div class="p-ladder">${rentLadder(card.color)}</div></div>`;
       return face;
     }
@@ -138,7 +144,7 @@
         const st = dark ? '' : 'color:#1a1a1a;text-shadow:none';
         const on = chosen === color ? ' on' : (chosen ? ' off' : '');
         return `<div class="w-half ${pos}${on}" style="background:var(--c-${color})">` +
-          `<div class="wh-name" style="${st}">${esc(CM[color].label)}</div>` +
+          `<div class="wh-name" style="${st}">${esc(colorLabel(color))}</div>` +
           `<div class="wh-rent" style="${st}">${rentLadderShort(color)}</div></div>`;
       };
       face.innerHTML = PILL +
@@ -156,7 +162,7 @@
         ? `<div class="rent-any">ANY<br>COLOR</div>`
         : card.colors.map(c => {
             const dk = LIGHT_BANDS.indexOf(c) === -1;
-            return `<div class="rent-bar" style="background:var(--c-${c})${dk ? '' : ';color:#1a1a1a;text-shadow:none'}">${esc(CM[c].label)}</div>`;
+            return `<div class="rent-bar" style="background:var(--c-${c})${dk ? '' : ';color:#1a1a1a;text-shadow:none'}">${esc(colorLabel(c))}</div>`;
           }).join('');
       face.innerHTML = PILL +
         `<div class="a-head">RENT</div>` +
@@ -223,8 +229,8 @@
       document.getElementById('app').classList.remove('game-over');
       this._closeDetail(); this._closeOverlay();
 
-      let chosen = 3;          // default: 3 AI opponents (4 players)
-      let diff = 'normal';     // default difficulty
+      let chosen = this._lastNumAI || 3;     // remember the last setup
+      let diff = this._lastDiff || 'normal';
       const root = this.$('setup');
       const render = () => {
         root.innerHTML =
@@ -254,6 +260,7 @@
       this.$('winner').classList.remove('show');
       this._pendingMove = null; this._bubbles = {};
       this.difficulty = difficulty || 'normal';
+      this._lastNumAI = numAI; this._lastDiff = this.difficulty;   // for Play Again
 
       const players = [{ name: 'You', agent: new HumanAgent(this) }];
       for (let i = 0; i < numAI; i++) {
@@ -387,7 +394,7 @@
         if (!dark) chip.style.color = '#1a1a1a';
         const count = complete ? `${req}/${req}${n > req ? '+' + (n - req) : ''}` : `${n}/${req}`;
         chip.innerHTML =
-          `<span class="sc-name">${esc(CM[color].label)}</span>` +
+          `<span class="sc-name">${esc(colorLabel(color))}</span>` +
           `<span class="sc-count">${count}${grp.house ? '🏠' : ''}${grp.hotel ? '🏨' : ''}</span>`;
         container.append(chip);
       });
@@ -593,9 +600,9 @@
         if (enabled) b.addEventListener('click', fn);
         return b;
       };
-      // Flip only appears on two-color wilds (the only cards where it does
-      // anything) — not on money / single-purpose cards.
-      if (d.isWild) acts.append(mkBtn('flip', '🔄', 'Flip', true, () => { d.colorIdx = (d.colorIdx + 1) % d.colors.length; this._drawDetail(); }));
+      // No Flip button: every wild (two-color AND any-color) picks its color in
+      // the color-swatch picker on Play — Flip was redundant with that and
+      // implied state it didn't keep.
       acts.append(mkBtn('bank', '🏦', 'Bank', !!d.bankMove, () => this._resolveMove(d.bankMove)));
       acts.append(mkBtn('play', '✔', 'Play', d.playMoves.length > 0, () => this._playFromDetail()));
       // "Close" just dismisses this card (returns to the hand). Ending the turn
@@ -716,7 +723,7 @@
         const b = elNew('button', 'swatch' + (win ? ' win' : completes ? ' completes' : ''));
         b.style.background = `var(--c-${m.color})`;
         if (!dark) b.style.color = '#1a1a1a';
-        b.innerHTML = `<span class="sw-name">${esc(CM[m.color].label)}</span>` +
+        b.innerHTML = `<span class="sw-name">${esc(colorLabel(m.color))}</span>` +
           (win ? '<span class="sw-tag">🏆 WINS</span>' : completes ? '<span class="sw-tag">✓ completes</span>' : '');
         b.addEventListener('click', () => this._resolveMove(m));
         grid.append(b);

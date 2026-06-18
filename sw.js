@@ -1,8 +1,12 @@
 /* =============================================================================
- * sw.js — Service worker for offline play (cache-first).
- * Bump CACHE on any asset change to force clients to refetch.
+ * sw.js — Service worker for "Business Deal" / Matt's Monopoly.
+ *
+ * NETWORK-FIRST for code so a freshly deployed build is always served when the
+ * device is online (the old cache-first strategy left players stuck on stale
+ * builds until they manually cleared the cache). The cache is only a fallback
+ * for offline play. Bump CACHE on any asset change.
  * ===========================================================================*/
-const CACHE = 'business-deal-v12';
+const CACHE = 'business-deal-v13';
 
 // Paths are relative so the app works from a GitHub Pages subfolder
 // (e.g. /business-deal/) as well as the domain root.
@@ -38,19 +42,18 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  // Network-first: try the network, refresh the cache, fall back to cache only
+  // when offline. Guarantees the latest deployed build whenever there's a
+  // connection (no more "stuck on an old version").
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request)
-        .then((resp) => {
-          // Cache successful same-origin responses for next time.
-          if (resp && resp.status === 200 && resp.type === 'basic') {
-            const copy = resp.clone();
-            caches.open(CACHE).then((c) => c.put(event.request, copy));
-          }
-          return resp;
-        })
-        .catch(() => cached); // offline and uncached
-    })
+    fetch(event.request)
+      .then((resp) => {
+        if (resp && resp.status === 200 && resp.type === 'basic') {
+          const copy = resp.clone();
+          caches.open(CACHE).then((c) => c.put(event.request, copy));
+        }
+        return resp;
+      })
+      .catch(() => caches.match(event.request)) // offline → last cached copy
   );
 });
