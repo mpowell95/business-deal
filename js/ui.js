@@ -213,7 +213,7 @@
       const render = () => {
         root.innerHTML =
           '<div class="scrim"></div><div class="sheet">' +
-          '<h3>Business Deal</h3><p>How many AI opponents?</p>' +
+          "<h3>Matt's Monopoly</h3><p>How many AI opponents?</p>" +
           '<div class="count-row">' +
           [1, 2, 3, 4].map(n => `<button class="count-btn${n === chosen ? ' sel' : ''}" data-n="${n}">${n}</button>`).join('') +
           '</div><p style="margin-top:14px">Difficulty</p><div class="count-row">' +
@@ -251,16 +251,20 @@
         tint: i === 0 ? '#0f59c8' : OPP_TINTS[(i - 1) % OPP_TINTS.length],
       }));
 
-      this.game.onTurnStart = (pl) => { this._bubbles = {}; this.render(); if (pl.id === 0) this.toast('Your turn — tap a card'); };
+      this.game.onTurnStart = (pl) => { this._bubbles = {}; this._seenLogs = this.game.logs.length; this.render(); if (pl.id === 0) this.toast('Your turn — tap a card'); };
       this.game.onAfterPlay = async (pl, mv) => {
-        if (pl.id !== 0) { this._bubbles[pl.id] = this._narrate(mv); this.toast(this._lastLog()); }
-        else { this.toast(this._humanFeedback(mv, this.game.logs.slice(this._logMark || 0))); }
-        this.render();
-        if (pl.id !== 0) await delay(this.aiDelay);
+        const fresh = this.game.logs.slice(this._seenLogs); this._seenLogs = this.game.logs.length;
+        if (pl.id !== 0) {
+          this._bubbles[pl.id] = this._narrate(mv); this.render();
+          await this._announceAIMove(pl, mv, fresh);   // clear beat for attacks; toast otherwise
+        } else {
+          this.toast(this._humanFeedback(mv, fresh)); this.render();
+        }
       };
       this.game.onTurnEnd = () => this.render();
 
       this.game.setup();
+      this._seenLogs = this.game.logs.length;
       document.getElementById('app').classList.add('playing'); // reveal the board
       this.render();
       this.runLoop();
@@ -468,6 +472,33 @@
       return ''; // bank / property placements are self-evident on the board
     }
 
+    /** Announce an AI move. Property-stealing actions against the human get a
+     *  blocking "beat" (a clear OK modal) so you never lose a property between
+     *  frames; everything else is a brief toast + the usual AI pause. */
+    async _announceAIMove(pl, mv, fresh) {
+      const atk = pl.name;
+      let beat = null, m;
+      for (const l of fresh) {
+        if ((m = l.match(/steals (.+?) from You\b/))) beat = `${atk} played Sly Deal and took your ${m[1]}.`;
+        else if ((m = l.match(/DEAL BREAKS You's (.+?) set/))) beat = `${atk} played Deal Breaker and took your ${m[1]} set!`;
+        else if (/swaps properties with You\b/.test(l)) beat = `${atk} played Forced Deal and swapped a property with you.`;
+      }
+      if (beat) { return this._beat('You were attacked!', beat); }
+      // Charged you (rent/debt/birthday)? You already saw the payment screen.
+      const paid = fresh.reduce((s, l) => { const x = l.match(/You pays .+? (\d+)M/); return s + (x ? +x[1] : 0); }, 0);
+      if (paid > 0) { this.toast(`You paid ${paid}M to ${atk}`); return delay(this.aiDelay); }
+      this.toast(this._lastLog());
+      return delay(this.aiDelay);
+    }
+
+    /** A blocking acknowledgement modal — pauses the game until the user taps OK. */
+    _beat(title, msg) {
+      return new Promise(resolve => {
+        const sheet = this._sheet(`<h3>${esc(title)}</h3><p>${esc(msg)}</p><button class="cta" id="beat-ok">OK</button>`);
+        sheet.querySelector('#beat-ok').addEventListener('click', () => { this._closeOverlay(); resolve(); });
+      });
+    }
+
     /* ======================================================================
      * Human move selection
      * ====================================================================*/
@@ -481,9 +512,6 @@
     _resolveMove(move) {
       const p = this._pendingMove; this._pendingMove = null;
       this._closeDetail(); this._closeOverlay();
-      // Mark the log position so onAfterPlay can summarise just this move's
-      // results (rent collected, steals, "nobody could pay", …).
-      this._logMark = this.game ? this.game.logs.length : 0;
       if (p) p.resolve(move);
     }
 
@@ -523,9 +551,30 @@
       acts.append(mkBtn('play', '✔', 'Play', d.playMoves.length > 0, () => this._playFromDetail()));
       acts.append(mkBtn('pass', '➜', 'Pass', true, () => this._resolveMove({ type: 'pass' })));
       wrap.append(acts);
+      // Explain a greyed-out Play so it doesn't look like a bug.
+      if (d.playMoves.length === 0) {
+        const reason = this._playDisabledReason(card);
+        if (reason) wrap.append(elNew('div', 'detail-note', '✔ Play unavailable — ' + esc(reason)));
+      }
       root.append(wrap);
       root.querySelector('.scrim').addEventListener('click', () => this._closeDetail());
       root.classList.add('show');
+    }
+
+    _playDisabledReason(card) {
+      if (card.type === T.MONEY) return 'money is banked, not played.';
+      if (card.type === T.RENT) return 'you don’t own any of this card’s colors yet.';
+      if (card.type !== T.ACTION) return '';
+      switch (card.action) {
+        case A.JUST_SAY_NO: return 'it plays automatically when you’re attacked.';
+        case A.DOUBLE_RENT: return 'play it together with a Rent card to double it.';
+        case A.HOUSE: return 'needs a complete set with no house yet.';
+        case A.HOTEL: return 'needs a complete set that already has a house.';
+        case A.DEAL_BREAKER: return 'no opponent has a complete set to steal.';
+        case A.SLY_DEAL:
+        case A.FORCED_DEAL: return 'no opponent has a stealable property.';
+        default: return 'it can’t be played right now.';
+      }
     }
 
     _playFromDetail() {
@@ -586,8 +635,12 @@
         // Distinguish any still-identical labels as a last resort.
         seen[lbl.text] = (seen[lbl.text] || 0) + 1;
         const label = seen[lbl.text] > 1 ? `${lbl.text} (${seen[lbl.text]})` : lbl.text;
-        return { label, win: lbl.win, onPick: () => this._resolveMove(m) };
+        // Surface the useful choices first (winning, then completing a set),
+        // so on a 10-color wild you don't scroll past junk to find them.
+        const rank = lbl.win ? 0 : (/completes/.test(lbl.text) ? 1 : 2);
+        return { label, win: lbl.win, rank, onPick: () => this._resolveMove(m) };
       });
+      options.sort((a, b) => a.rank - b.rank);
       this._pickList(title || 'Choose a target', options);
     }
 
@@ -680,7 +733,7 @@
       const options = unique.map(m => {
         const pd = this._propDesc(me, m.myCardId);
         const label = pd
-          ? `Give your ${pd.name} ($${pd.value}M) [${pd.count}/${pd.req}]`
+          ? `Give your ${pd.name} (${pd.value}M) [${pd.count}/${pd.req}]`
           : 'Give property';
         return { label, win: false, onPick: () => this._resolveMove(m) };
       });
@@ -769,15 +822,17 @@
 
     promptPayment(view, ctx) {
       const me = view.me;
+      const completeColors = new Set(Object.keys(me.properties).filter(c => me.properties[c].cards.length >= REQ[c]));
       // Gather selectable assets, keeping the real card object so we can render
       // an authentic face for each (bank money, then property cards/buildings).
       const bankAssets = me.bank.filter(c => c.canPay !== false).map(c => ({ card: c, value: c.value }));
       const propAssets = [];
       Object.keys(me.properties).forEach(color => {
         const g = me.properties[color];
-        g.cards.forEach(c => { if (c.canPay) propAssets.push({ card: c, value: c.value }); });
-        if (g.house) propAssets.push({ card: g.house, value: g.house.value });
-        if (g.hotel) propAssets.push({ card: g.hotel, value: g.hotel.value });
+        const breaks = completeColors.has(color); // paying with this breaks a finished set
+        g.cards.forEach(c => { if (c.canPay) propAssets.push({ card: c, value: c.value, breaks }); });
+        if (g.house) propAssets.push({ card: g.house, value: g.house.value, breaks });
+        if (g.hotel) propAssets.push({ card: g.hotel, value: g.hotel.value, breaks });
       });
       const all = bankAssets.concat(propAssets);
       const total = all.reduce((s, a) => s + a.value, 0);
@@ -788,7 +843,7 @@
 
       return new Promise(resolve => {
         const root = this.$('overlay');
-        root.innerHTML = '<div class="scrim"></div>';
+        root.innerHTML = '';
 
         if (!all.length) {
           const sheet = this._sheet(`<h3>You owe ${ctx.amount}M to ${esc(creditor)}</h3>` +
@@ -801,52 +856,55 @@
         const screen = elNew('div', 'pay-screen');
         const banner = elNew('div', 'pay-banner',
           `<div class="main">${esc(creditor)} ${verb} ${ctx.amount}M${forWhat}.</div>` +
-          '<div class="sub" id="pay-sub">Select cards worth the requested amount (no change given).</div>');
-        const mid = elNew('div', 'pay-mid');
-        if (ctx.sourceCard) mid.append(renderCardFace(ctx.sourceCard));
-        const sel = elNew('div', 'pay-selected', 'Selected 0M');
-        const actions = elNew('div', 'pay-actions');
-        const payBtn = elNew('button', 'pay-go', 'Pay'); payBtn.disabled = true;
-        const clearBtn = elNew('button', 'pay-clear', 'Clear');
-        actions.append(payBtn, clearBtn);
-        mid.append(sel, actions);
+          '<div class="sub" id="pay-sub">Select cards worth the amount — no change given.</div>');
 
-        const zones = elNew('div', 'pay-zones');
-        const bankZone = elNew('div', 'pay-zone');
-        const propZone = elNew('div', 'pay-zone');
-        if (!bankAssets.length) bankZone.append(elNew('div', 'zempty', 'No bank cards'));
-        if (!propAssets.length) propZone.append(elNew('div', 'zempty', 'No properties'));
-        zones.append(bankZone, propZone);
+        // Scrollable middle: the charging card, then labelled bank + property rows.
+        const scroll = elNew('div', 'pay-scroll');
+        if (ctx.sourceCard) { const sc = renderCardFace(ctx.sourceCard); sc.classList.add('pay-source'); sc.style.cursor = 'default'; scroll.append(sc); }
 
-        const sum = () => all.filter(a => selected.has(a.card.id)).reduce((s, a) => s + a.value, 0);
         const refresh = () => {
-          const s = sum();
+          const s = all.filter(a => selected.has(a.card.id)).reduce((sum, a) => sum + a.value, 0);
           sel.textContent = `Selected ${s}M`;
           payBtn.disabled = s < required;
           banner.querySelector('#pay-sub').textContent = s >= required
-            ? 'Now you can pay the amount.'
-            : `Select cards worth ≥ ${required}M (no change given).`;
+            ? 'Tap Pay to settle up.' : `Need ${required}M (no change given).`;
         };
-        const addAsset = (a, zone) => {
-          const f = renderCardFace(a.card);
-          f.addEventListener('click', () => {
-            if (selected.has(a.card.id)) { selected.delete(a.card.id); f.classList.remove('sel'); }
-            else { selected.add(a.card.id); f.classList.add('sel'); }
-            refresh();
+        const mkZone = (label, assets, emptyMsg) => {
+          scroll.append(elNew('div', 'pay-zlabel', label));
+          const zone = elNew('div', 'pay-zone');
+          if (!assets.length) zone.append(elNew('div', 'zempty', emptyMsg));
+          assets.forEach(a => {
+            const wrap = elNew('div', 'pay-card' + (a.breaks ? ' breaks' : ''));
+            wrap.append(renderCardFace(a.card));
+            if (a.breaks) wrap.append(elNew('div', 'breaks-tag', '⚠ breaks set'));
+            wrap.addEventListener('click', () => {
+              if (selected.has(a.card.id)) { selected.delete(a.card.id); wrap.classList.remove('sel'); }
+              else { selected.add(a.card.id); wrap.classList.add('sel'); }
+              refresh();
+            });
+            zone.append(wrap);
           });
-          zone.append(f);
+          scroll.append(zone);
         };
-        bankAssets.forEach(a => addAsset(a, bankZone));
-        propAssets.forEach(a => addAsset(a, propZone));
+        mkZone('Bank', bankAssets, 'No bank cards');
+        mkZone('Properties', propAssets, 'No properties — bank only');
+
+        // Fixed footer so the controls never float over the board.
+        const footer = elNew('div', 'pay-footer');
+        const sel = elNew('div', 'pay-selected', 'Selected 0M');
+        const payBtn = elNew('button', 'pay-go', 'Pay'); payBtn.disabled = true;
+        const clearBtn = elNew('button', 'pay-clear', 'Clear');
+        const btns = elNew('div', 'pay-actions'); btns.append(payBtn, clearBtn);
+        footer.append(sel, btns);
 
         payBtn.addEventListener('click', () => { this._closeOverlay(); resolve([...selected]); });
         clearBtn.addEventListener('click', () => {
           selected.clear();
-          screen.querySelectorAll('.cardface.sel').forEach(e => e.classList.remove('sel'));
+          screen.querySelectorAll('.pay-card.sel').forEach(e => e.classList.remove('sel'));
           refresh();
         });
 
-        screen.append(banner, mid, zones);
+        screen.append(banner, scroll, footer);
         root.append(screen);
         root.classList.add('show');
         refresh();

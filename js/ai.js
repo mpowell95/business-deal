@@ -405,39 +405,48 @@
       return false;
     }
 
-    // Payment logic (CLAUDE.md "Payment Logic"): lowest-value money first;
-    // avoid properties; if forced, give from sets furthest from completion.
+    // Payment logic (CLAUDE.md "Payment Logic"): cover the debt with the LEAST
+    // value possible (no needless overpay), preferring bank money and, when a
+    // property must go, the ones furthest from completion. The old greedy
+    // "cheapest-first until covered" overshot badly (e.g. 7M to settle 5M).
     choosePayment(view, ctx) {
       const me = view.me;
-      const bank = me.bank
-        .filter(c => c.canPay !== false)
-        .map(c => ({ id: c.id, value: c.value }))
-        .sort((a, b) => a.value - b.value);
-
-      const props = [];
+      const assets = [];
+      // rank = how reluctant we are to give a card up (lower = spend first):
+      //   bank money 0  <  incomplete props (further-from-done lower)  <  complete-set props
+      for (const c of me.bank) if (c.canPay !== false) assets.push({ id: c.id, value: c.value, rank: 0 });
       for (const color of Object.keys(me.properties)) {
         const g = me.properties[color];
         const complete = g.cards.length >= REQ[color];
-        const distance = REQ[color] - g.cards.length; // bigger = further from done
-        for (const c of g.cards) if (c.canPay) props.push({ id: c.id, value: c.value, complete, distance });
-        if (g.house) props.push({ id: g.house.id, value: g.house.value, complete, distance });
-        if (g.hotel) props.push({ id: g.hotel.id, value: g.hotel.value, complete, distance });
+        const distance = REQ[color] - g.cards.length;       // bigger = further from done
+        const rank = complete ? 100 : (10 - Math.min(distance, 9)); // incomplete & further => give first
+        for (const c of g.cards) if (c.canPay) assets.push({ id: c.id, value: c.value, rank });
+        if (g.house) assets.push({ id: g.house.id, value: g.house.value, rank });
+        if (g.hotel) assets.push({ id: g.hotel.id, value: g.hotel.value, rank });
       }
-      // Keep complete sets intact; otherwise pay from furthest-from-completion,
-      // cheapest first.
-      props.sort((a, b) =>
-        (a.complete ? 1 : 0) - (b.complete ? 1 : 0) ||
-        b.distance - a.distance ||
-        a.value - b.value);
+      const required = ctx.required;
+      const total = assets.reduce((s, a) => s + a.value, 0);
+      if (total <= required) return assets.map(a => a.id); // can't cover it — give everything
 
-      const order = bank.concat(props);
-      const chosen = [];
-      let sum = 0;
-      for (const a of order) {
-        if (sum >= ctx.required) break;
-        chosen.push(a.id);
-        sum += a.value;
+      // 0/1 knapsack DP over reachable sums. cost = rank*BIG + value, so we first
+      // pick the smallest sum that still covers the debt (min overpay), then —
+      // among subsets of that same sum — the one giving up the least-prized cards.
+      const BIG = 1000;
+      const cost = new Array(total + 1).fill(Infinity);
+      const pick = new Array(total + 1).fill(null);
+      cost[0] = 0;
+      for (let i = 0; i < assets.length; i++) {
+        const a = assets[i], c = a.rank * BIG + a.value;
+        for (let s = total; s >= a.value; s--) {
+          if (cost[s - a.value] + c < cost[s]) { cost[s] = cost[s - a.value] + c; pick[s] = { prev: s - a.value, idx: i }; }
+        }
       }
+      let best = -1;
+      for (let s = required; s <= total; s++) if (cost[s] < Infinity) { best = s; break; }
+      if (best === -1) return assets.map(a => a.id); // shouldn't happen (total > required)
+
+      const chosen = [];
+      for (let s = best; s > 0 && pick[s]; s = pick[s].prev) chosen.push(assets[pick[s].idx].id);
       return chosen;
     }
 
