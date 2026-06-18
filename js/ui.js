@@ -116,11 +116,13 @@
     if (card.type === T.PROPERTY_WILD) {
       face.classList.add('wild');
       if (card.isMulti) {
-        // Multi-color "any" wild: rainbow field with a clear ANY label.
-        face.innerHTML = PILL +
+        // Multi-color "any" wild: rainbow field with a clear ANY label. No value
+        // pill — it has no cash value, and a "0" reads like a junk card.
+        face.innerHTML =
           `<div class="wm-band"></div>` +
           `<div class="wm-body"><div class="wm-title">PROPERTY WILD</div>` +
-          `<div class="wm-any">ANY<br>COLOR</div></div>`;
+          `<div class="wm-any">ANY<br>COLOR</div>` +
+          `<div class="wm-note">no cash value</div></div>`;
         return face;
       }
       // Two-color wild: split into the two colors, each half labeled with its
@@ -143,10 +145,19 @@
 
     if (card.type === T.RENT) {
       face.classList.add('rent');
+      // The functional info IS the color pair + who it hits — make THAT the big,
+      // glanceable content (the decorative wheel was hiding it before).
+      const scope = card.isWild ? 'ONE' : 'ALL';
+      const body = card.isWild
+        ? `<div class="rent-any">ANY<br>COLOR</div>`
+        : card.colors.map(c => {
+            const dk = LIGHT_BANDS.indexOf(c) === -1;
+            return `<div class="rent-bar" style="background:var(--c-${c})${dk ? '' : ';color:#1a1a1a;text-shadow:none'}">${esc(CM[c].label)}</div>`;
+          }).join('');
       face.innerHTML = PILL +
-        `<div class="a-head">ACTION CARD</div>` +
-        `<div class="a-emblem"><div class="wheel" style="background:${rentWheelBg(card.colors)}"><span class="rent-lbl">RENT</span></div></div>` +
-        `<div class="a-desc">${card.isWild ? 'Charge ONE player any color you own.' : 'Charge ALL players: ' + card.colors.map(c => CM[c].label).join(' / ') + '.'}</div>`;
+        `<div class="a-head">RENT</div>` +
+        `<div class="rent-scope scope-${scope.toLowerCase()}">Charge ${scope}</div>` +
+        `<div class="rent-colors${card.isWild ? ' any' : ''}">${body}</div>`;
       return face;
     }
 
@@ -205,6 +216,7 @@
       // later in the DOM, so if left up it covers the sheet and swallows taps
       // (the "Play Again is a dead-end" bug).
       const win = this.$('winner'); win.classList.remove('show'); win.innerHTML = '';
+      document.getElementById('app').classList.remove('game-over');
       this._closeDetail(); this._closeOverlay();
 
       let chosen = 3;          // default: 3 AI opponents (4 players)
@@ -251,7 +263,17 @@
         tint: i === 0 ? '#0f59c8' : OPP_TINTS[(i - 1) % OPP_TINTS.length],
       }));
 
-      this.game.onTurnStart = (pl) => { this._bubbles = {}; this._seenLogs = this.game.logs.length; this.render(); if (pl.id === 0) this.toast('Your turn — tap a card'); };
+      this.game.onTurnStart = async (pl) => {
+        this._bubbles = {}; this._seenLogs = this.game.logs.length; this.render();
+        if (pl.id === 0) {
+          const m = this._lastLog().match(/draws (\d+)/);
+          this.toast(m ? `Your turn — you drew ${m[1]}` : 'Your turn — tap a card');
+        } else {
+          // A clear "AI's turn" beat so attacks don't land on you with no warning.
+          this.toast(`${pl.name}'s turn…`);
+          await delay(650);
+        }
+      };
       this.game.onAfterPlay = async (pl, mv) => {
         const fresh = this.game.logs.slice(this._seenLogs); this._seenLogs = this.game.logs.length;
         if (pl.id !== 0) {
@@ -261,11 +283,20 @@
           this.toast(this._humanFeedback(mv, fresh)); this.render();
         }
       };
+      // Narrate every Just Say No so the player understands why their JSN did
+      // (or didn't) stick — e.g. the AI silently countering with its own JSN.
+      this.game.onJsnPlayed = async (info) => {
+        const who = info.responder.id === 0 ? 'You' : info.responder.name;
+        this.toast(`${who} played Just Say No — ${info.actionCard.name} ${info.proceeds ? 'proceeds' : 'is cancelled'}!`);
+        this.render();
+        await delay(1500);
+      };
       this.game.onTurnEnd = () => this.render();
 
       this.game.setup();
       this._seenLogs = this.game.logs.length;
-      document.getElementById('app').classList.add('playing'); // reveal the board
+      const app = document.getElementById('app');
+      app.classList.add('playing'); app.classList.remove('game-over'); // reveal the board
       this.render();
       this.runLoop();
     }
@@ -557,10 +588,14 @@
         if (enabled) b.addEventListener('click', fn);
         return b;
       };
-      acts.append(mkBtn('flip', '🔄', 'Flip', d.isWild, () => { d.colorIdx = (d.colorIdx + 1) % d.colors.length; this._drawDetail(); }));
+      // Flip only appears on two-color wilds (the only cards where it does
+      // anything) — not on money / single-purpose cards.
+      if (d.isWild) acts.append(mkBtn('flip', '🔄', 'Flip', true, () => { d.colorIdx = (d.colorIdx + 1) % d.colors.length; this._drawDetail(); }));
       acts.append(mkBtn('bank', '🏦', 'Bank', !!d.bankMove, () => this._resolveMove(d.bankMove)));
       acts.append(mkBtn('play', '✔', 'Play', d.playMoves.length > 0, () => this._playFromDetail()));
-      acts.append(mkBtn('pass', '➜', 'Pass', true, () => this._resolveMove({ type: 'pass' })));
+      // "Close" just dismisses this card (returns to the hand). Ending the turn
+      // is the board's big Pass button — two different actions, two names.
+      acts.append(mkBtn('close', '✕', 'Close', true, () => this._closeDetail()));
       wrap.append(acts);
       // Explain a greyed-out Play so it doesn't look like a bug.
       if (d.playMoves.length === 0) {
@@ -600,7 +635,7 @@
       if (card.type === T.PROPERTY_WILD) {
         if (d.playMoves.length === 1) return this._resolveMove(d.playMoves[0]);
         this._closeDetail();
-        return this._showTargets(d.playMoves, 'Place wildcard as…');
+        return this._showColorPicker(d.playMoves, 'Place wildcard as…');
       }
       // Swap/steal get guided pickers so the lists stay short and unambiguous.
       if (card.type === T.ACTION && card.action === A.FORCED_DEAL) {
@@ -653,6 +688,41 @@
       });
       options.sort((a, b) => a.rank - b.rank);
       this._pickList(title || 'Choose a target', options);
+    }
+
+    /** Wildcard color picker — an actual grid of COLOR SWATCHES (not a text
+     *  list), completing colors first, with a Cancel that's always reachable. */
+    _showColorPicker(moves, title) {
+      const me = this._view.me;
+      const scored = moves.map(m => {
+        const before = countOf(me.properties, m.color);
+        const completes = before < REQ[m.color] && before + 1 >= REQ[m.color];
+        const win = completes && me.completeSets + 1 >= 3;
+        return { m, completes, win, rank: win ? 0 : completes ? 1 : 2 };
+      }).sort((a, b) => a.rank - b.rank);
+
+      const root = this.$('overlay');
+      root.innerHTML = '<div class="scrim"></div>';
+      const sheet = elNew('div', 'sheet swatch-sheet');
+      sheet.append(elNew('h3', null, esc(title || 'Place wildcard as…')));
+      const grid = elNew('div', 'swatch-grid');
+      scored.forEach(({ m, completes, win }) => {
+        const dark = LIGHT_BANDS.indexOf(m.color) === -1;
+        const b = elNew('button', 'swatch' + (win ? ' win' : completes ? ' completes' : ''));
+        b.style.background = `var(--c-${m.color})`;
+        if (!dark) b.style.color = '#1a1a1a';
+        b.innerHTML = `<span class="sw-name">${esc(CM[m.color].label)}</span>` +
+          (win ? '<span class="sw-tag">🏆 WINS</span>' : completes ? '<span class="sw-tag">✓ completes</span>' : '');
+        b.addEventListener('click', () => this._resolveMove(m));
+        grid.append(b);
+      });
+      sheet.append(grid);
+      const cancel = elNew('button', 'cta swatch-cancel', 'Cancel');
+      cancel.addEventListener('click', () => this._closeOverlay());
+      sheet.append(cancel);
+      root.append(sheet);
+      root.querySelector('.scrim').addEventListener('click', () => this._closeOverlay());
+      root.classList.add('show');
     }
 
     /** Describe a property a player holds: color/name, $value, set progress. */
@@ -980,6 +1050,9 @@
         '<button class="cta" id="again">Play Again</button></div>';
       root.querySelector('#again').addEventListener('click', () => this.showSetup());
       root.classList.add('show');
+      // The board's bottom "New Game" sits under this overlay (dead tap); hide it
+      // so "Play Again" is the single, working restart.
+      document.getElementById('app').classList.add('game-over');
     }
   }
 

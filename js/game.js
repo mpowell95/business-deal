@@ -249,7 +249,7 @@
       const n = player.hand.length === 0 ? DRAW_EMPTY : DRAW_NORMAL;
       const drew = this.drawCards(player, n);
       this.log(`-- Turn ${this.turn}: ${player.name} draws ${drew.length} (hand ${player.hand.length}).`);
-      if (typeof this.onTurnStart === 'function') this.onTurnStart(player);
+      if (typeof this.onTurnStart === 'function') await this.onTurnStart(player);
       if (this._checkWin(player)) return this.winner;
 
       // 2. Play up to 3 cards.
@@ -610,6 +610,11 @@
         proceeds = !proceeds;
         this.log(`  ${responder.name} plays Just Say No (` +
           (proceeds ? 'action will proceed' : 'action cancelled') + ').');
+        // Surface each Just Say No so the player sees the back-and-forth (and
+        // understands why their own JSN may or may not have stuck).
+        if (typeof this.onJsnPlayed === 'function') {
+          await this.onJsnPlayed({ responder, actionCard, proceeds, attackerId: attacker.id, defenderId: defender.id });
+        }
 
         responder = responder.id === defender.id ? attacker : defender; // other side
       }
