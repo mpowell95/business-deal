@@ -28,6 +28,10 @@
   const elNew = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
   const esc = (s) => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
+  // Bump alongside the sw.js cache name on every release so the visible stamp
+  // and the cached build always match.
+  const APP_VERSION = 'v12';
+
   const LIGHT_BANDS = ['lightblue', 'yellow', 'utility']; // need dark text on band
 
   // AI opponent flavor (names + avatar emoji + header tint).
@@ -230,7 +234,8 @@
           [1, 2, 3, 4].map(n => `<button class="count-btn${n === chosen ? ' sel' : ''}" data-n="${n}">${n}</button>`).join('') +
           '</div><p style="margin-top:14px">Difficulty</p><div class="count-row">' +
           ['easy', 'normal', 'hard'].map(d => `<button class="count-btn diff${d === diff ? ' sel' : ''}" data-d="${d}" style="width:auto;padding:0 16px;font-size:15px">${d[0].toUpperCase() + d.slice(1)}</button>`).join('') +
-          '</div><button class="cta" id="start-btn">Start Game</button></div>';
+          '</div><button class="cta" id="start-btn">Start Game</button>' +
+          `<div class="setup-version">${APP_VERSION}</div></div>`;
         root.querySelectorAll('.count-btn[data-n]').forEach(b =>
           b.addEventListener('click', () => { chosen = +b.dataset.n; render(); }));
         root.querySelectorAll('.count-btn[data-d]').forEach(b =>

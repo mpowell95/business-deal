@@ -69,8 +69,30 @@
       const ui = new UI.BusinessDealUI();
       window.__bd = ui;
       ui.showSetup(); // pick number of opponents, then start
+
+      // ---- PWA + "update available" prompt -------------------------------
+      // A cache-first service worker means an installed app keeps serving the
+      // old build until it's reloaded. Detect when a newer worker has installed
+      // and surface a one-tap Reload so you always know you're behind.
+      function showUpdate() {
+        if (document.getElementById('update-banner')) return;
+        var b = document.createElement('div');
+        b.id = 'update-banner';
+        b.innerHTML = '<span>New version available</span><button type="button">Reload</button>';
+        b.querySelector('button').addEventListener('click', function () { location.reload(); });
+        document.body.appendChild(b);
+      }
       if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-        navigator.serviceWorker.register('sw.js').catch(function (e) {
+        navigator.serviceWorker.register('sw.js').then(function (reg) {
+          if (reg.waiting && navigator.serviceWorker.controller) showUpdate();
+          reg.addEventListener('updatefound', function () {
+            var nw = reg.installing;
+            if (!nw) return;
+            nw.addEventListener('statechange', function () {
+              if (nw.state === 'installed' && navigator.serviceWorker.controller) showUpdate();
+            });
+          });
+        }).catch(function (e) {
           console.warn('Service worker registration failed:', e);
         });
       }
