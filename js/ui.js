@@ -30,7 +30,7 @@
 
   // Bump alongside the sw.js cache name on every release so the visible stamp
   // and the cached build always match.
-  const APP_VERSION = 'v13';
+  const APP_VERSION = 'v14';
 
   const LIGHT_BANDS = ['lightblue', 'yellow', 'utility']; // need dark text on band
 
@@ -281,9 +281,10 @@
           const m = this._lastLog().match(/draws (\d+)/);
           this.toast(m ? `Your turn — you drew ${m[1]}` : 'Your turn — tap a card');
         } else {
-          // A clear "AI's turn" beat so attacks don't land on you with no warning.
+          // A clear "AI's turn" beat so attacks don't land on you with no warning,
+          // and a moment to review your board after your own turn ends.
           this.toast(`${pl.name}'s turn…`);
-          await delay(650);
+          await delay(850);
         }
       };
       this.game.onAfterPlay = async (pl, mv) => {
@@ -537,7 +538,7 @@
         else if ((m = l.match(/DEAL BREAKS You's (.+?) set/))) beat = `${atk} played Deal Breaker and took your ${m[1]} set!`;
         else if (/swaps properties with You\b/.test(l)) beat = `${atk} played Forced Deal and swapped a property with you.`;
       }
-      if (beat) { return this._beat('You were attacked!', beat); }
+      if (beat) { return this._beat('You were attacked!', beat, this._cardOfMove(mv)); }
       // Charged you (rent/debt/birthday)? You already saw the payment screen.
       const paid = fresh.reduce((s, l) => { const x = l.match(/You pays .+? (\d+)M/); return s + (x ? +x[1] : 0); }, 0);
       if (paid > 0) { this.toast(`You paid ${paid}M to ${atk}`); return delay(this.aiDelay); }
@@ -545,10 +546,26 @@
       return delay(this.aiDelay);
     }
 
-    /** A blocking acknowledgement modal — pauses the game until the user taps OK. */
-    _beat(title, msg) {
+    /** The card an AI move played — now sitting on top of the discard pile. */
+    _cardOfMove(move) {
+      for (let i = this.game.discard.length - 1; i >= 0; i--) {
+        if (this.game.discard[i].id === move.cardId) return this.game.discard[i];
+      }
+      return null;
+    }
+
+    /** A blocking acknowledgement modal — pauses the game until the user taps OK.
+     *  Shows the offending card face when one is supplied (per-attack visual). */
+    _beat(title, msg, card) {
       return new Promise(resolve => {
-        const sheet = this._sheet(`<h3>${esc(title)}</h3><p>${esc(msg)}</p><button class="cta" id="beat-ok">OK</button>`);
+        const sheet = this._sheet(
+          `<h3>${esc(title)}</h3><div class="beat-card"></div><p>${esc(msg)}</p>` +
+          '<button class="cta" id="beat-ok">OK</button>');
+        if (card) {
+          const f = renderCardFace(card);
+          f.style.setProperty('--fs', '12px'); f.style.cursor = 'default';
+          sheet.querySelector('.beat-card').append(f);
+        }
         sheet.querySelector('#beat-ok').addEventListener('click', () => { this._closeOverlay(); resolve(); });
       });
     }
@@ -588,10 +605,11 @@
       const d = this._detail;
       const card = this._view.me.hand.find(c => c.id === d.cardId);
       const root = this.$('card-detail');
-      const chosen = d.isWild ? d.colors[d.colorIdx] : null;
       root.innerHTML = '<div class="scrim"></div>';
       const wrap = elNew('div', 'detail-wrap');
-      wrap.append(renderCardFace(card, { chosenColor: chosen }));
+      // No dimmed half — Flip is gone, so show both colors of a wild at full
+      // brightness (the dimming made the inactive half hard to read).
+      wrap.append(renderCardFace(card));
 
       const acts = elNew('div', 'actions');
       const mkBtn = (cls, icon, label, enabled, fn) => {

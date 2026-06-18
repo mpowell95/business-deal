@@ -203,9 +203,11 @@ html, body {
  * ===========================================================================*/
 #me-area {
   flex: 0 0 auto;
-  /* Bank kept compact; properties get the room (per the reference). */
+  /* Bank kept compact; properties get the room (per the reference). Capped so a
+     large bank/property collection scrolls inside its zone instead of growing
+     up into the hand. */
   display: grid; grid-template-columns: 52px 0.8fr 2.3fr; gap: 6px;
-  padding: 4px 8px; align-items: stretch; min-height: 92px;
+  padding: 4px 8px; align-items: stretch; min-height: 92px; max-height: 118px;
 }
 #me-side { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
 #me-avatar {
@@ -223,8 +225,8 @@ html, body {
 }
 .zone .zlabel { width: 100%; font-size: 9px; color: var(--ink-soft); opacity: .8; }
 .bank-chip {
-  min-width: 18px; height: 22px; border-radius: 4px; padding: 0 3px;
-  background: #fff; color: #1a5e34; font-size: 11px; font-weight: 900;
+  min-width: 16px; height: 19px; border-radius: 4px; padding: 0 3px;
+  background: #fff; color: #1a5e34; font-size: 10px; font-weight: 900;
   display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,.3);
 }
 
@@ -306,8 +308,8 @@ html, body {
   text-shadow: 0 .06em .09em rgba(0,0,0,.5); line-height: .96; letter-spacing: -.01em;
 }
 .cardface.property .p-body { padding: .5em .55em; }
-.cardface.property .p-ladder { font-size: .95em; color: #333; line-height: 1.3; white-space: nowrap; }
-.cardface.property .p-ladder b { color: #111; }
+.cardface.property .p-ladder { font-size: 1.02em; color: #1b1b1b; font-weight: 800; line-height: 1.32; white-space: nowrap; }
+.cardface.property .p-ladder b { color: #000; }
 
 /* two-color wildcard — split into the two colors, each half labeled with its
    color name + rents (rebuilt from scratch). */
@@ -550,9 +552,12 @@ html, body {
    never cover the payment screen or a picker; pointer-events:none so it never
    blocks taps. */
 #toast {
-  position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 8px);
-  transform: translateX(-50%);
-  z-index: 45; max-width: 92%; display: none; pointer-events: none;
+  /* Float over the EMPTY center of the table (between the opponents row and
+     your bank/hand), so it never covers the panel whose state just changed.
+     z-index stays below the modals (50) and pointer-events:none so it can't
+     block taps or cover the payment screen. */
+  position: fixed; left: 50%; top: 41%; transform: translate(-50%, -50%);
+  z-index: 45; max-width: 88%; display: none; pointer-events: none;
 }
 #toast.show { display: block; }
 #toast .msg { background: rgba(0,0,0,.88); color: #fff; font-size: 14px; font-weight: 800;
@@ -586,6 +591,10 @@ html, body {
   font-size: 1.7em; font-weight: 900; color: #fff; line-height: .95; text-align: center;
   text-shadow: 0 .08em .12em rgba(0,0,0,.55);
 }
+
+/* card face shown inside the "You were attacked!" beat modal */
+.beat-card { display: flex; justify-content: center; margin: 8px 0 12px; }
+.beat-card .cardface { box-shadow: 0 8px 22px rgba(0,0,0,.55); }
 
 /* "no cash value" note on the any-color wild (replaces the confusing 0 pill) */
 .cardface.wild .wm-note {
@@ -621,10 +630,16 @@ html, body {
  * instead of a top-pinned strip in a sea of blue.
  * ===========================================================================*/
 @media (min-width: 700px) {
-  body { display: flex; align-items: center; justify-content: center; padding: 18px; }
+  body {
+    display: flex; align-items: center; justify-content: center; padding: 18px;
+    /* a deliberate dark "table" backdrop so the frame reads as a device, not a
+       column floating in flat blue */
+    background: radial-gradient(130% 90% at 50% -10%, #11519e 0%, #07296a 55%, #03132f 100%);
+  }
   #app {
     height: min(100%, 900px); border-radius: 26px;
-    box-shadow: 0 28px 80px rgba(0,0,0,.6); overflow: hidden;
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 28px 80px rgba(0,0,0,.6), 0 0 0 6px rgba(255,255,255,.04); overflow: hidden;
   }
   /* keep full-bleed panels within the frame width */
   .pay-screen { left: 50%; right: auto; width: 100%; max-width: 560px; transform: translateX(-50%); }
