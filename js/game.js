@@ -256,7 +256,7 @@
       this.playsRemaining = MAX_PLAYS;
       let guard = 0;
       while (this.playsRemaining > 0 && !this.winner) {
-        if (++guard > 50) break; // safety: never spin forever
+        if (++guard > 120) break; // safety: never spin forever (free reassigns allowed)
         const legal = this.enumerateMoves(player);
         let move;
         try {
@@ -267,6 +267,14 @@
         }
         if (!move || move.type === 'pass') break;
         const used = await this.executeMove(player, move);
+        // Reassigning a placed wildcard is a FREE reorganize — it consumes no
+        // play and must not end the turn (real-rules: move wilds any time).
+        if (move.type === 'reassign') {
+          if (used <= 0) break; // invalid reassign — don't spin
+          if (typeof this.onAfterPlay === 'function') await this.onAfterPlay(player, move);
+          if (this._checkWin(player)) return this.winner;
+          continue;
+        }
         if (used <= 0) break; // invalid move — stop to avoid an infinite loop
         this.playsRemaining -= used;
         if (typeof this.onAfterPlay === 'function') await this.onAfterPlay(player, move);
@@ -368,7 +376,9 @@
       const color = valid.indexOf(move.color) !== -1 ? move.color : found.color;
       this.addProperty(player, found.card, color);
       this.log(`${player.name} reassigns ${Deck.describe(found.card)} to ${Deck.COLOR_META[color].label}.`);
-      return 0; // reorganizing does not cost a play
+      // Return 1 to signal SUCCESS to the turn loop (it special-cases 'reassign'
+      // and never subtracts a play); 0 means the reassign was invalid.
+      return 1;
     }
 
     async _doAction(player, move) {
@@ -481,9 +491,13 @@
         case A.FORCED_DEAL: {
           const mine = this.removeFromTable(player, move.myCardId);
           const theirs = this.removeFromTable(target, move.targetCardId);
+          // Name both cards (before they move) so the UI can show what each side
+          // gave/got in a Forced Deal swap.
+          const givesDesc = mine ? Deck.describe(mine.card) : 'nothing';
+          const takesDesc = theirs ? Deck.describe(theirs.card) : 'nothing';
           if (mine) await this._giveProperty(target, mine.card, mine.color);
           if (theirs) await this._giveProperty(player, theirs.card, theirs.color);
-          this.log(`  ${player.name} swaps properties with ${target.name}.`);
+          this.log(`  ${player.name} swaps with ${target.name}: takes ${takesDesc}, gives ${givesDesc}.`);
           break;
         }
         case A.DEAL_BREAKER: {

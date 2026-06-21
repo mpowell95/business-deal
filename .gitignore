@@ -13,3 +13,7 @@ IMG_*.png
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Feedback docx + extracted screenshots (not part of the game)
+Business_Deal_Screenshot_Feedback.docx
+.fbimg/

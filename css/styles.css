@@ -91,40 +91,49 @@ html, body {
   color: #fff; font-size: 11px;
 }
 .opp-avatar {
-  width: 22px; height: 22px; border-radius: 50%;
+  width: 26px; height: 26px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 13px; background: rgba(255,255,255,.9); flex: 0 0 auto;
+  font-size: 15px; background: rgba(255,255,255,.9); flex: 0 0 auto;
   border: 2px solid rgba(255,255,255,.7);
 }
-.opp-name { font-size: 10.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 auto; }
+/* Bigger, easier-to-read player name + stats (per feedback). */
+.opp-name { font-size: 13.5px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 auto; }
 .opp-bank {
-  display: inline-flex; align-items: center; gap: 2px;
-  background: rgba(0,0,0,.25); border-radius: 10px; padding: 1px 5px 1px 2px;
-  font-size: 10px; flex: 0 0 auto;
+  display: inline-flex; align-items: center; gap: 3px;
+  background: rgba(0,0,0,.28); border-radius: 10px; padding: 1px 6px 1px 2px;
+  font-size: 12.5px; font-weight: 900; flex: 0 0 auto;
 }
-.opp-meta { display: flex; align-items: center; gap: 4px; padding: 2px 5px; font-size: 10px; color: var(--ink-soft); }
-.opp-body { flex: 1 1 auto; padding: 3px; display: flex; flex-direction: column; gap: 3px; align-content: flex-start; overflow-y: auto; min-height: 0; }
+.opp-meta { display: flex; align-items: center; gap: 7px; padding: 2px 6px; font-size: 12.5px; font-weight: 800; color: #fff; }
+/* Chips size to content and WRAP, so a set doesn't hog the whole row. */
+.opp-body { flex: 1 1 auto; padding: 4px; display: flex; flex-flow: row wrap; gap: 4px; align-content: flex-start; overflow-y: auto; min-height: 0; }
 
-/* readable colored set chip: COLOR NAME + count (e.g. "PINK 2/3"). Replaces the
-   unlabeled mini-stacks so opponents' holdings are clear at a glance. */
+/* Colored set chip: COLOR NAME + count, plus a per-card detail line (values +
+   wildcards) so you can judge what to steal/trade. Sizes to content + wraps. */
 .set-chip {
-  display: flex; align-items: center; gap: 4px;
-  border-radius: 6px; padding: 2px 6px; color: #fff;
+  display: flex; flex-direction: column; gap: 2px;
+  border-radius: 7px; padding: 3px 6px 4px; color: #fff;
   font-weight: 900; box-shadow: 0 1px 2px rgba(0,0,0,.35);
-  max-width: 100%; min-width: 0;
+  flex: 0 1 auto; max-width: 100%; min-width: 0;
   cursor: default; pointer-events: none;   /* display-only — never looks tappable */
 }
-.set-chip.complete { box-shadow: 0 0 0 2px var(--coin), 0 1px 3px rgba(0,0,0,.4); }
+.set-chip.complete { box-shadow: 0 0 0 3px var(--coin), 0 1px 4px rgba(0,0,0,.45); }
+.set-chip .sc-row { display: flex; align-items: center; gap: 5px; }
 .set-chip .sc-name {
-  font-size: 10px; letter-spacing: .02em; text-transform: uppercase;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 auto; min-width: 0;
-  text-shadow: 0 1px 1px rgba(0,0,0,.35);
+  font-size: 11.5px; letter-spacing: .02em; text-transform: uppercase;
+  white-space: nowrap; text-shadow: 0 1px 1px rgba(0,0,0,.35);
 }
+.set-chip.complete .sc-name::after { content: ' ✓'; color: var(--coin); }
 .set-chip .sc-count {
-  font-size: 10px; background: rgba(255,255,255,.85); color: #1a1a1a;
-  border-radius: 5px; padding: 0 4px; flex: 0 0 auto;
+  font-size: 11px; background: rgba(255,255,255,.9); color: #1a1a1a;
+  border-radius: 5px; padding: 0 5px; flex: 0 0 auto;
 }
-.opp-empty { font-size: 9px; color: var(--ink-soft); opacity: .65; font-weight: 700; padding: 2px; }
+.set-chip .sc-cards { display: flex; flex-wrap: wrap; gap: 3px; }
+.set-chip .ctag {
+  font-size: 10px; font-weight: 900; background: rgba(255,255,255,.92); color: #1a1a1a;
+  border-radius: 4px; padding: 0 3px; white-space: nowrap;
+}
+.set-chip .ctag.wildtag { background: #181818; color: #ffd23f; }  /* wildcards stand out */
+.opp-empty { font-size: 11px; color: var(--ink-soft); opacity: .7; font-weight: 700; padding: 2px; }
 
 /* speech bubble shown over a player panel */
 .bubble {
@@ -155,22 +164,22 @@ html, body {
 }
 .pile-stack { position: relative; z-index: 1; }
 #draw-pile .cardback {
-  width: 54px; height: 76px; border-radius: 8px;
+  width: 70px; height: 98px; border-radius: 9px;
   background: linear-gradient(145deg, #15a07a, #0c6b53);
   border: 2px solid #0a4a39;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  text-align: center; gap: 3px; padding: 0 2px;
+  text-align: center; gap: 4px; padding: 0 3px;
   color: #eafff5; box-shadow: 0 3px 8px rgba(0,0,0,.4);
 }
-/* Both words must fit the 54px card width — MONOPOLY (8 chars) is the limit. */
-#draw-pile .cardback span { font-weight: 900; line-height: 1; letter-spacing: -.3px; white-space: nowrap; }
-#draw-pile .cardback span:first-child { font-size: 7px; opacity: .9; }
-#draw-pile .cardback span:last-child { font-size: 7px; }
+/* Both words must fit the card width — MONOPOLY (8 chars) is the limit. */
+#draw-pile .cardback span { font-weight: 900; line-height: 1; letter-spacing: -.2px; white-space: nowrap; }
+#draw-pile .cardback span:first-child { font-size: 9px; opacity: .9; }
+#draw-pile .cardback span:last-child { font-size: 10.5px; }
 #draw-pile .count, #discard-pile .count {
-  text-align: center; font-size: 11px; color: var(--ink-soft); margin-top: 2px;
+  text-align: center; font-size: 12px; font-weight: 800; color: var(--ink-soft); margin-top: 3px;
 }
-#discard-pile { min-width: 54px; min-height: 76px; }
-#discard-pile .empty { width: 54px; height: 76px; border-radius: 8px; border: 2px dashed rgba(255,255,255,.3); }
+#discard-pile { min-width: 70px; min-height: 98px; }
+#discard-pile .empty { width: 70px; height: 98px; border-radius: 9px; border: 2px dashed rgba(255,255,255,.3); }
 #table-right { margin-left: auto; flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 1; }
 #pass-btn {
   flex: 0 0 auto;
@@ -216,19 +225,21 @@ html, body {
   border: 3px solid #fff; box-shadow: 0 0 0 2px var(--blue-1);
 }
 #me-area.active #me-avatar { box-shadow: 0 0 0 3px var(--coin), 0 0 12px rgba(255,210,63,.7); }
-#me-name { font-size: 11px; }
-#me-stats { font-size: 10px; color: var(--ink-soft); display: flex; flex-direction: column; align-items: center; gap: 1px; }
+#me-name { font-size: 13px; font-weight: 900; }
+#me-stats { font-size: 12.5px; font-weight: 800; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .zone {
   background: var(--panel); border: 1px solid var(--panel-line); border-radius: 10px;
   padding: 4px; display: flex; flex-wrap: wrap; gap: 3px; align-content: flex-start;
   overflow-y: auto;
 }
-.zone .zlabel { width: 100%; font-size: 9px; color: var(--ink-soft); opacity: .8; }
+.zone .zlabel { width: 100%; font-size: 11px; font-weight: 800; color: var(--ink-soft); opacity: .85; }
 .bank-chip {
-  min-width: 16px; height: 19px; border-radius: 4px; padding: 0 3px;
-  background: #fff; color: #1a5e34; font-size: 10px; font-weight: 900;
+  min-width: 20px; height: 23px; border-radius: 4px; padding: 0 4px;
+  background: #fff; color: #1a5e34; font-size: 12.5px; font-weight: 900;
   display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,.3);
 }
+/* Bigger coin badge (M amounts must be easy to read). */
+.coin { width: 1.35em; height: 1.35em; font-size: .9em; }
 
 /* =============================================================================
  * Hand
@@ -279,8 +290,8 @@ html, body {
   display: flex; flex-direction: column; align-items: center; line-height: .78;
   box-shadow: 0 .12em .22em rgba(0,0,0,.32); border: .08em solid rgba(0,0,0,.18);
 }
-.cardface .v-pill .v-num { font-size: 2.75em; font-weight: 900; color: #141414; }
-.cardface .v-pill .v-m { font-size: .82em; font-weight: 900; color: #141414; margin-top: .42em; }
+.cardface .v-pill .v-num { font-size: 1.95em; font-weight: 900; color: #141414; }
+.cardface .v-pill .v-m { font-size: .72em; font-weight: 900; color: #141414; margin-top: .3em; }
 
 /* money */
 .cardface.money { color: #1a1a1a; }
@@ -304,8 +315,8 @@ html, body {
   height: 5em; display: flex; align-items: center; justify-content: center; padding: .2em .35em;
 }
 .cardface.property .p-band .p-name {
-  color: #fff; font-size: 1.95em; font-weight: 900; text-align: center;
-  text-shadow: 0 .06em .09em rgba(0,0,0,.5); line-height: .96; letter-spacing: -.01em;
+  color: #fff; font-size: 1.7em; font-weight: 900; text-align: center; white-space: nowrap;
+  text-shadow: 0 .06em .09em rgba(0,0,0,.5); line-height: .96; letter-spacing: -.02em;
 }
 .cardface.property .p-body { padding: .5em .55em; }
 .cardface.property .p-ladder { font-size: 1.02em; color: #1b1b1b; font-weight: 800; line-height: 1.32; white-space: nowrap; }
@@ -319,20 +330,20 @@ html, body {
   flex: 1 1 50%; display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: .25em .3em; text-align: center; min-height: 0;
 }
-.cardface.wild .w-half.top { padding-top: 2.7em; }      /* clear the value pill */
+.cardface.wild .w-half.top { padding-top: 3.9em; }      /* clear the value pill */
 .cardface.wild .w-half.off { filter: brightness(.5); }
 .cardface.wild .w-half.on { box-shadow: inset 0 0 0 .28em var(--coin); }
-.cardface.wild .wh-name { font-size: 1.55em; font-weight: 900; line-height: 1; text-shadow: 0 .06em .09em rgba(0,0,0,.5); }
+.cardface.wild .wh-name { font-size: 1.4em; font-weight: 900; line-height: 1; white-space: nowrap; text-shadow: 0 .06em .09em rgba(0,0,0,.5); }
 .cardface.wild .wh-rent { font-size: .82em; font-weight: 800; margin-top: .3em; text-shadow: 0 .05em .07em rgba(0,0,0,.45); }
 .cardface.wild .w-tag {
-  position: absolute; bottom: .35em; right: .45em; z-index: 4;
-  background: rgba(0,0,0,.55); color: #fff; font-size: .82em; font-weight: 900;
-  padding: .08em .4em; border-radius: .3em; letter-spacing: .1em;
+  position: absolute; bottom: .4em; left: 50%; transform: translateX(-50%); z-index: 4;
+  background: rgba(0,0,0,.62); color: #fff; font-size: 1.1em; font-weight: 900;
+  padding: .12em .6em; border-radius: .35em; letter-spacing: .16em;
 }
 /* multi-color "any" wild */
 .cardface.wild .wm-band { position: absolute; inset: 0; background: linear-gradient(150deg,#e23b9a,#f08a1d,#f6cf2e,#2faa5d,#1f3a93); }
 .cardface.wild .wm-body {
-  position: absolute; inset: 0; padding-top: 2.6em;
+  position: absolute; inset: 0; padding-top: .4em;   /* no value pill on the any-wild */
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .35em; text-align: center;
 }
 .cardface.wild .wm-title { font-size: .92em; font-weight: 900; letter-spacing: .05em; text-shadow: 0 .06em .09em rgba(0,0,0,.5); }
@@ -347,13 +358,20 @@ html, body {
 .cardface.rent { background: linear-gradient(160deg,#e7d8c5,#cdb79c); }
 .cardface.action, .cardface.rent { display: flex; flex-direction: column; }
 
-/* one-line ACTION CARD header — right-aligned (pill is on the left), like the
-   reference; small enough to never wrap or clip. */
-.cardface .a-head {
-  flex: 0 0 auto; padding: .5em .55em .32em; text-align: right;
-  font-size: .8em; font-weight: 900; color: #3a2c1a; letter-spacing: .02em;
-  white-space: nowrap; background: rgba(255,255,255,.22);
+/* Header ROW: [value pill][label] side by side. The pill is INLINE here (not
+   absolute) so it can never overlap the ACTION CARD / RENT label — the recurring
+   "1M is covering the text" complaint. */
+.cardface .c-head {
+  flex: 0 0 auto; display: flex; align-items: center; gap: .4em;
+  padding: .3em .5em; background: rgba(255,255,255,.26);
 }
+.cardface .c-head .v-pill { position: static; top: auto; left: auto; }
+.cardface .c-head-label {
+  flex: 1 1 auto; text-align: right; font-size: .82em; font-weight: 900;
+  color: #3a2c1a; letter-spacing: .03em; white-space: nowrap;
+}
+/* RENT is the card's identity — make it big and glanceable, not the smallest text. */
+.cardface .c-head-label.rent-word { font-size: 1.6em; color: #141414; letter-spacing: .05em; }
 /* icon emblem */
 .cardface .a-emblem { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; padding: .15em; min-height: 0; }
 .cardface .emblem-circle {
@@ -401,12 +419,13 @@ html, body {
 .act-btn.play .ic { background: linear-gradient(180deg,#36c06a,#1d9a4f); }
 .act-btn.pass .ic { background: radial-gradient(circle at 40% 35%, #ff9a4a, var(--pass) 70%); }
 .act-btn:disabled { opacity: .35; cursor: default; }
-/* caption under a greyed-out Play button explaining why it can't be played */
+/* Why a greyed-out Play can't be used — a clear banner ABOVE the card (was
+   crammed under it, half off-screen). Fixed to the top so it never overflows. */
 .detail-note {
-  position: absolute; left: 50%; bottom: -3.4em; transform: translateX(-50%);
-  background: rgba(0,0,0,.82); color: #ffd9c2; font-size: 12px; font-weight: 800;
-  padding: 7px 12px; border-radius: 10px; max-width: 240px; text-align: center; line-height: 1.2;
-  box-shadow: 0 4px 10px rgba(0,0,0,.4);
+  position: fixed; left: 50%; top: 12%; transform: translateX(-50%);
+  background: rgba(0,0,0,.88); color: #ffd9c2; font-size: 13px; font-weight: 800;
+  padding: 9px 16px; border-radius: 12px; max-width: 80%; text-align: center; line-height: 1.25;
+  box-shadow: 0 6px 14px rgba(0,0,0,.5); z-index: 5;
 }
 
 /* =============================================================================
@@ -443,6 +462,10 @@ html, body {
 }
 .pick.win { color: #6b4e00; background: linear-gradient(180deg,#ffe79a,var(--coin)); box-shadow: 0 2px 0 var(--coin-edge); }
 .pick.ghost { background: rgba(255,255,255,.12); color: #fff; box-shadow: none; border: 1px solid rgba(255,255,255,.3); text-align: center; }
+/* Color-coded picker rows — a fat colored stripe so steal/swap/rent choices read
+   visually instead of as a wall of white text. */
+.pick.pick-color { border-left: 10px solid var(--pick-c); padding-left: 12px; }
+.pick.pick-color.win { border-left-color: var(--pick-c); }
 @keyframes up { from { transform: translate(-50%,100%);} to { transform: translate(-50%,0);} }
 .sheet h3 { margin: 0 0 4px; font-size: 18px; }
 .sheet p { margin: 0 0 12px; font-size: 13px; color: var(--ink-soft); font-weight: 700; }
@@ -649,3 +672,21 @@ html, body {
   /* keep full-bleed panels within the frame width */
   .pay-screen { left: 50%; right: auto; width: 100%; max-width: 560px; transform: translateX(-50%); }
 }
+
+/* =============================================================================
+ * Misc: wildcard reassign button, secondary CTA, stats page
+ * ===========================================================================*/
+.reassign-btn {
+  width: 100%; margin-top: 4px; border: none; cursor: pointer; border-radius: 8px;
+  padding: 5px 6px; font-size: 11px; font-weight: 800; color: #143a72;
+  background: linear-gradient(180deg,#fff,#dfeaff); box-shadow: 0 2px 0 #9fb7e6;
+}
+.ghost-cta {
+  background: rgba(255,255,255,.14); color: #fff; box-shadow: none;
+  border: 1px solid rgba(255,255,255,.35); margin-top: 8px;
+}
+.win-stats { color: var(--coin) !important; font-weight: 900; margin: -8px 0 16px !important; }
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 14px; }
+.stat { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); border-radius: 12px; padding: 12px; text-align: center; }
+.stat-n { font-size: 30px; font-weight: 900; color: var(--coin); line-height: 1; }
+.stat-l { font-size: 12px; color: var(--ink-soft); font-weight: 800; margin-top: 4px; }

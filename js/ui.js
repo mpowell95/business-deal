@@ -30,7 +30,7 @@
 
   // Bump alongside the sw.js cache name on every release so the visible stamp
   // and the cached build always match.
-  const APP_VERSION = 'v15';
+  const APP_VERSION = 'v16';
 
   const LIGHT_BANDS = ['lightblue', 'yellow', 'utility']; // need dark text on band
 
@@ -66,11 +66,11 @@
     birthday: "IT'S MY BIRTHDAY", double_rent: 'DOUBLE RENT', house: 'HOUSE', hotel: 'HOTEL',
   };
   const ACTION_DESC = {
-    deal_breaker: 'Steal a complete set of properties.', just_say_no: 'Cancel an action played against you.',
-    pass_go: 'Draw 2 extra cards.', forced_deal: 'Swap a property with another player.',
-    sly_deal: 'Steal a property (not from a full set).', debt_collector: 'Force a player to pay you 5M.',
-    birthday: 'All players give you 2M.', double_rent: 'Play with a rent card to double it.',
-    house: 'Add to a full set: +3M rent.', hotel: 'Add to a full set: +4M rent.',
+    deal_breaker: 'Steal a complete set', just_say_no: 'Cancel an action played against you',
+    pass_go: 'Draw 2 extra cards', forced_deal: 'Swap a property with another player',
+    sly_deal: 'Steal a property (not from a full set)', debt_collector: 'Make a player pay you 5M',
+    birthday: 'All players give you 2M', double_rent: 'Play with a rent card to double it',
+    house: 'Add to a full set: +3M rent', hotel: 'Add to a full set: +4M rent',
   };
 
   /* ==========================================================================
@@ -155,8 +155,8 @@
 
     if (card.type === T.RENT) {
       face.classList.add('rent');
-      // The functional info IS the color pair + who it hits — make THAT the big,
-      // glanceable content (the decorative wheel was hiding it before).
+      // Header is a flex ROW: [value pill][RENT] — the pill can never overlap the
+      // label. The functional info (color pair + who it hits) is the big content.
       const scope = card.isWild ? 'ONE' : 'ALL';
       const body = card.isWild
         ? `<div class="rent-any">ANY<br>COLOR</div>`
@@ -164,20 +164,20 @@
             const dk = LIGHT_BANDS.indexOf(c) === -1;
             return `<div class="rent-bar" style="background:var(--c-${c})${dk ? '' : ';color:#1a1a1a;text-shadow:none'}">${esc(colorLabel(c))}</div>`;
           }).join('');
-      face.innerHTML = PILL +
-        `<div class="a-head">RENT</div>` +
+      face.innerHTML =
+        `<div class="c-head">${PILL}<div class="c-head-label rent-word">RENT</div></div>` +
         `<div class="rent-scope scope-${scope.toLowerCase()}">Charge ${scope}</div>` +
         `<div class="rent-colors${card.isWild ? ' any' : ''}">${body}</div>`;
       return face;
     }
 
-    // ACTION — one-line header; icon in a circle; the NAME as a full-width band
-    // below (hero word large) so even long names stay legible; fitted desc.
+    // ACTION — header ROW [value pill][ACTION CARD] so the pill never covers the
+    // label; icon in a circle; the NAME as a full-width band (hero word large).
     face.classList.add('action', 'act-' + card.action);
     const nm = ACTION_NAME[card.action] || { hero: esc(card.name) };
     const nameHTML = (nm.pre ? `<span class="pre">${esc(nm.pre)}</span>` : '') + `<span class="hero">${esc(nm.hero)}</span>`;
-    face.innerHTML = PILL +
-      `<div class="a-head">ACTION CARD</div>` +
+    face.innerHTML =
+      `<div class="c-head">${PILL}<div class="c-head-label">ACTION CARD</div></div>` +
       `<div class="a-emblem"><div class="emblem-circle"><div class="icon">${ACTION_ICON[card.action] || '⭐'}</div></div></div>` +
       `<div class="a-name">${nameHTML}</div>` +
       `<div class="a-desc">${ACTION_DESC[card.action] || ''}</div>`;
@@ -241,12 +241,14 @@
           '</div><p style="margin-top:14px">Difficulty</p><div class="count-row">' +
           ['easy', 'normal', 'hard'].map(d => `<button class="count-btn diff${d === diff ? ' sel' : ''}" data-d="${d}" style="width:auto;padding:0 16px;font-size:15px">${d[0].toUpperCase() + d.slice(1)}</button>`).join('') +
           '</div><button class="cta" id="start-btn">Start Game</button>' +
+          '<button class="cta ghost-cta" id="setup-stats">Stats</button>' +
           `<div class="setup-version">${APP_VERSION}</div></div>`;
         root.querySelectorAll('.count-btn[data-n]').forEach(b =>
           b.addEventListener('click', () => { chosen = +b.dataset.n; render(); }));
         root.querySelectorAll('.count-btn[data-d]').forEach(b =>
           b.addEventListener('click', () => { diff = b.dataset.d; render(); }));
         this.$('start-btn').addEventListener('click', () => { root.classList.remove('show'); this.newGame(chosen, diff); });
+        this.$('setup-stats').addEventListener('click', () => this.showStats());
         root.querySelector('.scrim').addEventListener('click', () => { if (this.game) root.classList.remove('show'); });
       };
       render();
@@ -259,6 +261,7 @@
       this.$('setup').classList.remove('show');
       this.$('winner').classList.remove('show');
       this._pendingMove = null; this._bubbles = {};
+      this._resultRecorded = false;   // record this game's win/loss once
       this.difficulty = difficulty || 'normal';
       this._lastNumAI = numAI; this._lastDiff = this.difficulty;   // for Play Again
 
@@ -350,11 +353,13 @@
 
       this._renderHand(me, myTurn);
 
-      // pass button + play dots + explicit "plays left" label
+      // pass button + play dots + explicit "plays left" label. Dots deplete
+      // LEFT-TO-RIGHT: a used play dims the leftmost dot first (we read L→R).
       this.$('pass-btn').disabled = !this._pendingMove;
       const dots = this.$('play-dots'); dots.innerHTML = '';
       const left = myTurn ? g.playsRemaining : 0;
-      for (let i = 0; i < 3; i++) dots.append(elNew('div', 'dot' + (i < left ? ' left' : '')));
+      const used = 3 - left;
+      for (let i = 0; i < 3; i++) dots.append(elNew('div', 'dot' + (i >= used ? ' left' : '')));
       this.$('plays-label').textContent = myTurn ? `Plays left: ${left}` : '';
     }
 
@@ -380,7 +385,7 @@
           `<span class="opp-bank"><span class="coin">M</span>${this._bank(p)}M</span>` +
           `<span>🂠×${p.hand.length}</span><span>${g.completeSetCount(p)}/3</span>`));
         const body = elNew('div', 'opp-body');
-        this._appendSets(body, p);
+        this._appendSets(body, p, { detail: true });   // show their cards' values + wildcards
         if (!Object.keys(p.properties).length) body.append(elNew('div', 'opp-empty', 'no property yet'));
         opp.append(body);
         if (this._bubbles[i]) opp.append(elNew('div', 'bubble', esc(this._bubbles[i])));
@@ -388,25 +393,46 @@
       }
     }
 
-    // Each owned set as a readable colored chip: COLOR NAME + count (e.g.
-    // "PINK 2/3"). Far clearer at a glance than unlabeled mini-stacks, and it
-    // puts the meaning on the property itself rather than a lone bank total.
-    _appendSets(container, player) {
+    // Each owned set as a readable colored chip (COLOR NAME + count). Chips size
+    // to content and wrap (so they don't hog horizontal space). An over-full
+    // color is shown as SEPARATE sets — you can't pile a 4th onto a complete
+    // 3-set; the extras form the next set (#13). opts.detail lists the actual
+    // cards (values + wildcards) so you can judge a steal/trade.
+    _appendSets(container, player, opts) {
+      opts = opts || {};
       Deck.allPropertyColors().forEach(color => {
         const grp = player.properties[color]; if (!grp) return;
         const req = REQ[color];
-        const n = grp.cards.length;
-        const complete = n >= req;
         const dark = LIGHT_BANDS.indexOf(color) === -1;
-        const chip = elNew('div', 'set-chip' + (complete ? ' complete' : ''));
-        chip.style.background = `var(--c-${color})`;
-        if (!dark) chip.style.color = '#1a1a1a';
-        const count = complete ? `${req}/${req}${n > req ? '+' + (n - req) : ''}` : `${n}/${req}`;
-        chip.innerHTML =
-          `<span class="sc-name">${esc(colorLabel(color))}</span>` +
-          `<span class="sc-count">${count}${grp.house ? '🏠' : ''}${grp.hotel ? '🏨' : ''}</span>`;
-        container.append(chip);
+        // Chunk the cards into sets of `req`: each full chunk is a complete set.
+        const chunks = [];
+        for (let i = 0; i < grp.cards.length; i += req) chunks.push(grp.cards.slice(i, i + req));
+        if (!chunks.length) return;
+        chunks.forEach((cards, ci) => {
+          const complete = cards.length >= req;
+          const chip = elNew('div', 'set-chip' + (complete ? ' complete' : ''));
+          chip.style.background = `var(--c-${color})`;
+          if (!dark) chip.style.color = '#1a1a1a';
+          const bldg = ci === 0 ? (grp.house ? '🏠' : '') + (grp.hotel ? '🏨' : '') : '';
+          const detail = opts.detail
+            ? `<span class="sc-cards">${cards.map(c => this._cardTag(c, color)).join('')}</span>` : '';
+          chip.innerHTML =
+            `<span class="sc-row"><span class="sc-name">${esc(colorLabel(color))}</span>` +
+            `<span class="sc-count">${cards.length}/${req}${bldg}</span></span>` + detail;
+          container.append(chip);
+        });
       });
+    }
+
+    /** A tiny per-card marker for the opponent detail line: real props show their
+     *  value; wildcards show their alt color(s) + value so you can spot a Red/
+     *  Yellow wild worth stealing. */
+    _cardTag(c, color) {
+      if (c.type === T.PROPERTY_WILD) {
+        const alt = c.isMulti ? 'ANY' : c.colors.map(k => CM[k].label).join('/');
+        return `<b class="ctag wildtag">✦ ${esc(alt)}${c.canPay ? ' ' + c.value + 'M' : ''}</b>`;
+      }
+      return `<b class="ctag">${c.value}M</b>`;
     }
     _appendBank(container, player) {
       player.bank.slice().sort((a, b) => b.value - a.value).forEach(c => {
@@ -421,7 +447,44 @@
     }
     _renderZoneProps(zone, player) {
       zone.innerHTML = '<div class="zlabel">Properties</div>';
-      this._appendSets(zone, player);
+      this._appendSets(zone, player, { detail: true });
+      // Free wildcard reassignment (#9): on your turn you may move a placed
+      // wildcard to another of its colors without spending a play.
+      if (this._pendingMove) {
+        const wilds = this._myWilds(player);
+        if (wilds.length) {
+          const btn = elNew('button', 'reassign-btn', '↻ Move wildcard');
+          btn.addEventListener('click', () => this._reassignFlow(wilds));
+          zone.append(btn);
+        }
+      }
+    }
+
+    /** Placed wildcards the human can still re-color (have >1 possible color). */
+    _myWilds(player) {
+      const out = [];
+      Object.keys(player.properties).forEach(color => {
+        player.properties[color].cards.forEach(c => {
+          if (c.type === T.PROPERTY_WILD && Deck.placeableColors(c).length > 1) out.push({ card: c, color });
+        });
+      });
+      return out;
+    }
+    _wildName(card) { return card.isMulti ? 'multi-color wild' : card.colors.map(c => CM[c].label).join('/') + ' wild'; }
+
+    _reassignFlow(wilds) {
+      if (wilds.length === 1) return this._reassignPickColor(wilds[0]);
+      const options = wilds.map(w => ({
+        label: `${this._wildName(w.card)} — now in ${colorLabel(w.color)}`,
+        color: w.color,
+        onPick: () => this._reassignPickColor(w),
+      }));
+      this._pickList('Move which wildcard?', options);
+    }
+    _reassignPickColor(w) {
+      const valid = Deck.placeableColors(w.card).filter(c => c !== w.color);
+      const moves = valid.map(color => ({ type: 'reassign', cardId: w.card.id, color }));
+      this._showColorPicker(moves, `Move ${this._wildName(w.card)} to…`);
     }
 
     _renderTable() {
@@ -432,7 +495,7 @@
       const top = g.discard[g.discard.length - 1];
       disc.innerHTML = '';
       if (top) {
-        const f = renderCardFace(top); f.style.setProperty('--fs', '5.9px'); f.style.cursor = 'default';
+        const f = renderCardFace(top); f.style.setProperty('--fs', '7.6px'); f.style.cursor = 'default';
         disc.append(f);
         disc.append(elNew('div', 'count', `×${g.discard.length}`));
       } else {
@@ -544,7 +607,7 @@
       for (const l of fresh) {
         if ((m = l.match(/steals (.+?) from You\b/))) beat = `${atk} played Sly Deal and took your ${m[1]}.`;
         else if ((m = l.match(/DEAL BREAKS You's (.+?) set/))) beat = `${atk} played Deal Breaker and took your ${m[1]} set!`;
-        else if (/swaps properties with You\b/.test(l)) beat = `${atk} played Forced Deal and swapped a property with you.`;
+        else if ((m = l.match(/swaps with You: takes (.+?), gives (.+?)\./))) beat = `${atk} played Forced Deal — took your ${m[1]} and gave you ${m[2]}.`;
       }
       if (beat) { return this._beat('You were attacked!', beat, this._cardOfMove(mv)); }
       // Charged you (rent/debt/birthday)? You already saw the payment screen.
@@ -635,10 +698,11 @@
       // is the board's big Pass button — two different actions, two names.
       acts.append(mkBtn('close', '✕', 'Close', true, () => this._closeDetail()));
       wrap.append(acts);
-      // Explain a greyed-out Play so it doesn't look like a bug.
+      // Explain a greyed-out Play so it doesn't look like a bug (clear banner
+      // above the card — not crammed under it).
       if (d.playMoves.length === 0) {
         const reason = this._playDisabledReason(card);
-        if (reason) wrap.append(elNew('div', 'detail-note', '✔ Play unavailable — ' + esc(reason)));
+        if (reason) wrap.append(elNew('div', 'detail-note', esc(reason)));
       }
       root.append(wrap);
       root.querySelector('.scrim').addEventListener('click', () => this._closeDetail());
@@ -646,8 +710,8 @@
     }
 
     _playDisabledReason(card) {
-      if (card.type === T.MONEY) return 'money is banked, not played.';
-      if (card.type === T.RENT) return 'you don’t own any of this card’s colors yet.';
+      if (card.type === T.MONEY) return 'Money is banked, not played';
+      if (card.type === T.RENT) return 'You don’t own any of this card’s colors';
       if (card.type !== T.ACTION) return '';
       // Complete sets I own, and whether any can actually take a building.
       const props = this._view.me.properties;
@@ -655,18 +719,18 @@
       const buildable = complete.filter(c => Deck.NO_BUILDING_COLORS.indexOf(c) === -1);
       const onlyRailUtil = complete.length > 0 && buildable.length === 0;
       switch (card.action) {
-        case A.JUST_SAY_NO: return 'it plays automatically when you’re attacked.';
-        case A.DOUBLE_RENT: return 'play it together with a Rent card to double it.';
+        case A.JUST_SAY_NO: return 'Plays automatically when you’re attacked';
+        case A.DOUBLE_RENT: return 'Play it together with a Rent card to double it';
         case A.HOUSE:
-          return onlyRailUtil ? 'Houses can’t be added to Railroad or Utility sets.'
-                              : 'needs a complete set with no house yet.';
+          return onlyRailUtil ? 'Houses can’t go on Railroad or Utility sets'
+                              : 'Needs a complete set with no house';
         case A.HOTEL:
-          return onlyRailUtil ? 'Hotels can’t be added to Railroad or Utility sets.'
-                              : 'needs a complete set that already has a house.';
-        case A.DEAL_BREAKER: return 'no opponent has a complete set to steal.';
+          return onlyRailUtil ? 'Hotels can’t go on Railroad or Utility sets'
+                              : 'Needs a complete set that already has a house';
+        case A.DEAL_BREAKER: return 'No opponent has a complete set to steal';
         case A.SLY_DEAL:
-        case A.FORCED_DEAL: return 'no opponent has a stealable property.';
-        default: return 'it can’t be played right now.';
+        case A.FORCED_DEAL: return 'No opponent has a stealable property';
+        default: return 'Can’t be played right now';
       }
     }
 
@@ -684,6 +748,11 @@
         this._closeDetail();
         return this._showColorPicker(d.playMoves, 'Place wildcard as…');
       }
+      // Rent gets its own clear flow (pick color/target, then a plain
+      // "Double the Rent?" yes/no) — not a cryptic "Choose a target" list.
+      if (card.type === T.RENT) {
+        this._closeDetail(); return this._rentFlow(d.playMoves);
+      }
       // Swap/steal get guided pickers so the lists stay short and unambiguous.
       if (card.type === T.ACTION && card.action === A.FORCED_DEAL) {
         this._closeDetail(); return this._forcedDealFlow(d.playMoves);
@@ -695,6 +764,34 @@
       if (d.playMoves.length === 1) return this._resolveMove(d.playMoves[0]);
       this._closeDetail();
       this._showTargets(d.playMoves);
+    }
+
+    /** Rent: pick color + who pays, then an explicit "Double the Rent?" step.
+     *  Replaces the confusing "Choose a target → Rent Light Blue" list (#5,#10). */
+    _rentFlow(moves) {
+      const view = this._view, me = view.me;
+      const bases = moves.filter(m => !(m.doubleCardIds && m.doubleCardIds.length));
+      const doubleOf = (b) => moves.find(m => m.doubleCardIds && m.doubleCardIds.length &&
+        m.color === b.color && m.targetPlayerId === b.targetPlayerId);
+
+      const askDouble = (base) => {
+        const dbl = doubleOf(base);
+        const amt = setRentUI(me.properties, base.color);
+        const who = base.targetPlayerId != null ? this._oppName(view, base.targetPlayerId) : 'all players';
+        if (!dbl) return this._resolveMove(base);
+        this._pickList('Double the Rent?', [
+          { label: `Yes — charge ${amt * 2}M (uses your Double the Rent card)`, win: true, color: base.color, onPick: () => this._resolveMove(dbl) },
+          { label: `No — charge ${amt}M`, color: base.color, onPick: () => this._resolveMove(base) },
+        ], { subtitle: `Rent on ${colorLabel(base.color)} — ${who} would pay ${amt}M.` });
+      };
+
+      if (bases.length === 1) return askDouble(bases[0]);
+      const options = bases.map(b => {
+        const amt = setRentUI(me.properties, b.color);
+        const who = b.targetPlayerId != null ? this._oppName(view, b.targetPlayerId) : 'all players';
+        return { label: `${colorLabel(b.color)} — ${who} pay ${amt}M`, color: b.color, onPick: () => askDouble(b) };
+      });
+      this._pickList('Charge rent for…', options);
     }
 
     /** Vertical, scrollable list picker with a sticky header. Each option is
@@ -709,6 +806,9 @@
       const list = elNew('div', 'pick-list');
       options.forEach(o => {
         const b = elNew('button', 'pick' + (o.win ? ' win' : ''), esc(o.label));
+        // Color-code the row by the property color so the choices read visually,
+        // not as an undifferentiated wall of white text.
+        if (o.color) { b.classList.add('pick-color'); b.style.setProperty('--pick-c', `var(--c-${o.color})`); }
         b.addEventListener('click', o.onPick);
         list.append(b);
       });
@@ -819,7 +919,7 @@
           ? `${opp.name} · ${pd.name} (${pd.value}M) [${pd.count}/${pd.req}]` +
             (win ? ' 🏆 WINS' : completes ? ' ✓ completes' : '')
           : 'Steal property';
-        return { label, win, onPick: () => this._resolveMove(m) };
+        return { label, win, color: pd && pd.color, onPick: () => this._resolveMove(m) };
       });
       this._pickList('Steal which property?', options);
     }
@@ -850,7 +950,7 @@
         const label = pd
           ? `Take ${opp.name}'s ${pd.name} (${pd.value}M)` + (completes ? ' ✓ completes' : '')
           : 'Take property';
-        return { label, win: false, onPick: () => this._forcedDealGive(list) };
+        return { label, win: false, color: pd && pd.color, onPick: () => this._forcedDealGive(list) };
       });
       this._pickList('Forced Deal — take which?', options);
     }
@@ -863,9 +963,9 @@
         const label = pd
           ? `Give your ${pd.name} (${pd.value}M) [${pd.count}/${pd.req}]`
           : 'Give property';
-        return { label, win: false, onPick: () => this._resolveMove(m) };
+        return { label, win: false, color: pd && pd.color, onPick: () => this._resolveMove(m) };
       });
-      this._pickList('Forced Deal — give which?', options, { subtitle: 'You give one of yours in exchange.' });
+      this._pickList('Forced Deal — give which?', options, { subtitle: 'You give one of yours in exchange' });
     }
 
     _closeDetail() { const r = this.$('card-detail'); r.classList.remove('show'); r.innerHTML = ''; }
@@ -966,8 +1066,7 @@
       const total = all.reduce((s, a) => s + a.value, 0);
       const required = Math.min(ctx.amount, total);
       const creditor = this._oppName(view, ctx.creditorId);
-      const verb = ctx.reason === 'birthday' ? 'is asking' : ctx.reason === 'rent' ? 'charges' : 'is demanding';
-      const forWhat = ctx.reason === 'birthday' ? ' for Birthday' : ctx.reason === 'rent' ? ' rent' : '';
+      const reasonWord = ctx.reason === 'birthday' ? 'Birthday' : ctx.reason === 'rent' ? 'Rent' : 'Debt';
 
       return new Promise(resolve => {
         const root = this.$('overlay');
@@ -975,16 +1074,17 @@
 
         if (!all.length) {
           const sheet = this._sheet(`<h3>You owe ${ctx.amount}M to ${esc(creditor)}</h3>` +
-            '<p>You have nothing on the table — you pay nothing.</p><button class="cta" id="ok">OK</button>');
+            '<p>You have nothing on the table — you pay nothing</p><button class="cta" id="ok">OK</button>');
           sheet.querySelector('#ok').addEventListener('click', () => { this._closeOverlay(); resolve([]); });
           return;
         }
 
         const selected = new Set();
         const screen = elNew('div', 'pay-screen');
+        // Minimal copy: who + amount on top, a short "Tap to select" hint below.
         const banner = elNew('div', 'pay-banner',
-          `<div class="main">${esc(creditor)} ${verb} ${ctx.amount}M${forWhat}.</div>` +
-          '<div class="sub" id="pay-sub">Select cards worth the amount — no change given.</div>');
+          `<div class="main">Pay ${ctx.amount}M to ${esc(creditor)}</div>` +
+          `<div class="sub" id="pay-sub">${esc(reasonWord)} · tap cards to select</div>`);
 
         // Scrollable middle: the charging card, then labelled bank + property rows.
         const scroll = elNew('div', 'pay-scroll');
@@ -994,11 +1094,11 @@
           const s = all.filter(a => selected.has(a.card.id)).reduce((sum, a) => sum + a.value, 0);
           sel.textContent = `Selected ${s}M`;
           payBtn.disabled = s < required;
-          // Warn explicitly when the selection exceeds the demand (no change back).
+          // Minimal hint; still flags overpay (no change back).
           banner.querySelector('#pay-sub').textContent =
-            s > required ? `Overpaying by ${s - required}M — no change given.`
-          : s === required ? 'Exact amount — tap Pay.'
-          : `Need ${required}M (no change given).`;
+            s > required ? `Overpaying ${s - required}M · no change given`
+          : s === required ? 'Tap Pay'
+          : `Tap cards to select · need ${required}M`;
         };
         const mkZone = (label, assets, emptyMsg) => {
           scroll.append(elNew('div', 'pay-zlabel', label));
@@ -1114,16 +1214,47 @@
       const w = this.game.winner;
       const root = this.$('winner');
       const sets = this.game.completeColors(w).map(c => CM[c].label).join(', ');
+      if (!this._resultRecorded) { this._recordResult(w.id === 0); this._resultRecorded = true; }
+      const s = this._loadStats();
       root.innerHTML =
         '<div class="scrim"></div><div class="win-card">' +
         `<h1>${w.id === 0 ? 'You Win! 🎉' : esc(w.name) + ' wins'}</h1>` +
         `<p>Winning sets: ${esc(sets)}</p>` +
-        '<button class="cta" id="again">Play Again</button></div>';
+        `<p class="win-stats">Record: ${s.won}W – ${s.lost}L</p>` +
+        '<button class="cta" id="again">Play Again</button>' +
+        '<button class="cta ghost-cta" id="win-stats">View Stats</button></div>';
       root.querySelector('#again').addEventListener('click', () => this.showSetup());
+      root.querySelector('#win-stats').addEventListener('click', () => this.showStats());
       root.classList.add('show');
       // The board's bottom "New Game" sits under this overlay (dead tap); hide it
       // so "Play Again" is the single, working restart.
       document.getElementById('app').classList.add('game-over');
+    }
+
+    /* ---- stats (persisted wins/losses) --------------------------------- */
+    _loadStats() {
+      try { return Object.assign({ played: 0, won: 0, lost: 0 }, JSON.parse(localStorage.getItem('bd-stats') || '{}')); }
+      catch (e) { return { played: 0, won: 0, lost: 0 }; }
+    }
+    _recordResult(humanWon) {
+      const s = this._loadStats();
+      s.played++; if (humanWon) s.won++; else s.lost++;
+      try { localStorage.setItem('bd-stats', JSON.stringify(s)); } catch (e) {}
+    }
+    showStats() {
+      const s = this._loadStats();
+      const rate = s.played ? Math.round(100 * s.won / s.played) : 0;
+      const cell = (n, l) => `<div class="stat"><div class="stat-n">${n}</div><div class="stat-l">${l}</div></div>`;
+      const sheet = this._sheet(
+        '<h3>Your Stats</h3><div class="stats-grid">' +
+        cell(s.played, 'Played') + cell(s.won, 'Won') + cell(s.lost, 'Lost') + cell(rate + '%', 'Win rate') +
+        '</div><button class="cta" id="stats-close">Close</button>' +
+        '<button class="cta ghost-cta" id="stats-reset">Reset stats</button>');
+      sheet.querySelector('#stats-close').addEventListener('click', () => this._closeOverlay());
+      sheet.querySelector('#stats-reset').addEventListener('click', () => {
+        try { localStorage.removeItem('bd-stats'); } catch (e) {}
+        this._closeOverlay(); this.showStats();
+      });
     }
   }
 
